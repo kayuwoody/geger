@@ -1,7 +1,11 @@
+// Every Double and Int in this file must be a real JSON number (see StrictNumbers.kt).
+@file:UseSerializers(StrictDoubleSerializer::class, StrictIntSerializer::class)
+
 package com.geger.positioning.map
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 /*
  * Raw shapes of map.json (schema version 1), exactly as stored on disk.

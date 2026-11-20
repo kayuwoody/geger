@@ -20,7 +20,9 @@ android/                 Gradle project (run all Gradle commands from here)
   replay-cli/            command-line tool: validates maps today, replays sessions from M7
   app/                   Android test app (M1: skeleton screen only)
 maps/sample/map.json     hand-written two-level sample map used by the tests
-tools/                   map editor (M2), plate generator (M4), analysis report (M7)
+maps/fixtures/           small valid (ok-*) and broken (bad-*) maps shared by the Kotlin and editor tests
+tools/map-editor/        browser map editor: open index.html (see its README)
+tools/                   plate generator (M4), analysis report (M7)
 ```
 
 ## Requirements
@@ -67,3 +69,12 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 Prints a summary and every warning; exits with code 1 and lists the errors if the map is unusable.
 Check a config file the same way with `validate-config <config.json>`.
+
+## Draw a map
+
+Open `tools/map-editor/index.html` in Chrome. Step-by-step instructions are in
+[`tools/map-editor/README.md`](tools/map-editor/README.md). Editor tests, from the repo root:
+
+```bash
+node --test tools/map-editor/test/*.test.js
+```

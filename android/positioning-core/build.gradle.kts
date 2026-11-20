@@ -38,6 +38,9 @@ tasks.test {
     useJUnitPlatform()
     // Tests load the shared sample map from the repo's maps/ folder.
     systemProperty("geger.sampleMap", rootProject.file("../maps/sample/map.json").absolutePath)
+    // Fixtures shared with the browser map editor's tests (see FixtureParityTest).
+    systemProperty("geger.fixturesDir", rootProject.file("../maps/fixtures").absolutePath)
+    inputs.dir(rootProject.file("../maps"))
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

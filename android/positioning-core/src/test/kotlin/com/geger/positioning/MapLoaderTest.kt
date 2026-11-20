@@ -60,6 +60,12 @@ class MapLoaderTest {
     }
 
     @Test
+    fun `number written as text is rejected`() {
+        val text = TestMaps.sampleText().replace("{\"id\": \"n1\", \"level\": \"L1\", \"x\": 2.0,", "{\"id\": \"n1\", \"level\": \"L1\", \"x\": \"2.0\",")
+        assertMentions(errorsOf(text), "Invalid map JSON", "found text \"2.0\"")
+    }
+
+    @Test
     fun `wrong schema and units are rejected`() {
         val text = TestMaps.sampleText().replace("\"schema\": 1", "\"schema\": 2").replace("\"units\": \"m\"", "\"units\": \"ft\"")
         val errors = errorsOf(text)

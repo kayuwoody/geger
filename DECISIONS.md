@@ -13,3 +13,10 @@ One line per choice that SPEC.md didn't cover: what was decided, and why. Newest
 - M1: the phone-heading rule's top-edge case uses ARCore's display-oriented camera pose (`camera.displayOrientedPose`), because the sensor-oriented `camera.pose` is landscape and its +y is not the screen's top edge in a portrait app.
 - M1: map validation errors make a map unusable; geometry findings (nodes, plates, checkpoints outside walkable space, edges cutting through walls, unconnected nodes) are warnings so an imperfect survey doesn't block a test day. Lift edges must change level; stairs may stay on one level.
 - M1: the config reader rejects unknown field names so a misspelt setting fails loudly instead of being ignored; map files ignore unknown fields so newer editors can add data.
+- M2: the map editor is `index.html` plus two plain scripts (`map-core.js`, `editor.js`) in one folder — still no build step and opens from disk — so the validation logic can also be unit-tested under Node.
+- M2: the editor re-implements map validation in JavaScript; shared fixtures in `maps/fixtures/` (ok-* load, bad-* rejected) are checked by both the Kotlin and the Node tests to keep the two in step.
+- M2: map numbers must be real JSON numbers in both validators; the Kotlin loader previously accepted numbers written as text ("x": "1"), found by the shared fixtures and made strict.
+- M2: export writes canonical JSON (fixed key order, one item per line, numbers rounded to 6 decimals, unknown fields kept at the end). "Version incremented on every save" is implemented as: the version goes up by one when a *changed* map is exported, so re-exporting an unchanged map gives a byte-identical file (the M2 check).
+- M2: with Snap on, placed points snap to 0.1 m and dragged angles to 1°; exact surveyed values are typed in the Selection panel.
+- M2: a loaded floor image gets a provisional background (origin at its bottom-left corner, 20 px/m) until Scale and Origin are set; the image file itself is not stored, only its name, scale and origin.
+- M2: new plates and checkpoints get ids A01/C01 (zero-padded as in the spec's examples); nodes n1, levels L1, destinations D1.

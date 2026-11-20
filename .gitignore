@@ -21,3 +21,6 @@ __pycache__/
 # OS clutter
 .DS_Store
 Thumbs.db
+
+# Map editor browser-test output
+tools/map-editor/test/e2e-output/

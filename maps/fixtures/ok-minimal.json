@@ -1,0 +1,18 @@
+{
+ "schema": 1,
+ "venue": "fixture",
+ "version": 1,
+ "units": "m",
+ "levels": [
+  {
+   "id": "L1",
+   "name": "Level 1",
+   "elevation_m": 0
+  },
+  {
+   "id": "L2",
+   "name": "Level 2",
+   "elevation_m": 5
+  }
+ ]
+}

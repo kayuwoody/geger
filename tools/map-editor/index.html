@@ -1,0 +1,160 @@
+<!doctype html>
+<!--
+  Geger map editor (Phase 0 placeholder maps).
+
+  Open this file in Chrome on a laptop (double-click it; no server or install needed).
+  It draws map.json files for the positioning trial over any floor image: walkable areas,
+  obstacles, the route network, QR plates (anchors), checkpoints and destinations.
+  See SPEC.md, "Placeholder map", and this folder's README.md.
+
+  Files: map-core.js = validation + JSON formatting (shared rules with the phone app),
+         editor.js   = everything on screen.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geger Map Editor</title>
+<style>
+  :root {
+    --bg: #f6f7f8; --panel: #ffffff; --ink: #1d2327; --muted: #5f6b73; --line: #d5dade;
+    --accent: #0b6e74; --accent-ink: #ffffff; --err: #b3261e; --warn: #8a5a00; --ok: #2e7d32;
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 52px 1fr 330px; height: 100vh; }
+  header { grid-column: 1 / 4; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 10px;
+           background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; }
+  header .spacer { flex: 1; }
+  button, select, input { font: inherit; }
+  button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 4px 9px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  input[type=text], input[type=number] { border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; width: 100%; }
+  label.inline { display: inline-flex; gap: 4px; align-items: center; }
+  #changed { color: var(--warn); font-weight: 600; }
+  #tools { grid-row: 2; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--panel);
+           border-right: 1px solid var(--line); }
+  #tools button { width: 40px; height: 40px; padding: 0; font-weight: 600; position: relative; }
+  #tools button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  #tools button small { position: absolute; right: 3px; bottom: 1px; font-size: 9px; opacity: .7; font-weight: 400; }
+  #stage { grid-row: 2; position: relative; overflow: hidden; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+  #side { grid-row: 2; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); }
+  section { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  .row { display: grid; grid-template-columns: 110px 1fr; gap: 6px; align-items: center; margin-bottom: 5px; }
+  .row label { color: var(--muted); }
+  .levels { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .levels button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .muted { color: var(--muted); }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 2px 3px; vertical-align: middle; }
+  textarea { width: 100%; min-height: 110px; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 5px; }
+  #validation ul { margin: 4px 0 0; padding-left: 18px; }
+  #validation li.err { color: var(--err); }
+  #validation li.warn { color: var(--warn); }
+  #validation .ok { color: var(--ok); font-weight: 600; }
+  footer { grid-column: 1 / 4; display: flex; gap: 18px; padding: 4px 10px; background: var(--panel);
+           border-top: 1px solid var(--line); color: var(--muted); white-space: nowrap; overflow: hidden; }
+  footer #hint { overflow: hidden; text-overflow: ellipsis; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Geger Map Editor</h1>
+  <button id="btn-new" title="Start an empty map">New</button>
+  <button id="btn-open" title="Open a map.json file">Open map.json…</button>
+  <button id="btn-export" class="primary" title="Validate and download map.json">Export map.json</button>
+  <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
+  <button id="btn-redo" title="Redo (Ctrl+Y)">Redo</button>
+  <button id="btn-fit" title="Fit the view (F)">Fit view</button>
+  <label class="inline"><input type="checkbox" id="snap" checked> Snap 0.1 m</label>
+  <span class="spacer"></span>
+  <label class="inline">Venue <input type="text" id="venue" style="width:160px"></label>
+  <span>Version <b id="version">1</b></span>
+  <a href="#validation" id="checks-badge" style="font-weight:600;text-decoration:none"></a>
+  <span id="changed"></span>
+  <input type="file" id="file-map" accept=".json,application/json">
+  <input type="file" id="file-image" accept="image/*">
+</header>
+
+<nav id="tools" aria-label="Tools">
+  <button data-tool="select" title="Select and move (V)">Sel<small>V</small></button>
+  <button data-tool="walkable" title="Draw walkable area (W)">Walk<small>W</small></button>
+  <button data-tool="obstacle" title="Draw obstacle (O)">Obst<small>O</small></button>
+  <button data-tool="node" title="Place route node (N)">Node<small>N</small></button>
+  <button data-tool="edge" title="Connect two nodes (E)">Edge<small>E</small></button>
+  <button data-tool="anchor" title="Place QR plate (A)">QR<small>A</small></button>
+  <button data-tool="checkpoint" title="Place checkpoint (C)">Chk<small>C</small></button>
+  <button data-tool="scale" title="Set image scale from a measured distance (S)">Scale<small>S</small></button>
+  <button data-tool="origin" title="Set the map origin on the image (G)">Orig<small>G</small></button>
+</nav>
+
+<main id="stage"><canvas id="canvas"></canvas></main>
+
+<aside id="side">
+  <section id="levels-panel">
+    <h2>Levels</h2>
+    <div class="levels" id="level-list"></div>
+    <div class="row"><label for="lvl-id">Id</label><input type="text" id="lvl-id"></div>
+    <div class="row"><label for="lvl-name">Name</label><input type="text" id="lvl-name"></div>
+    <div class="row"><label for="lvl-elev">Elevation (m)</label><input type="number" step="0.1" id="lvl-elev"></div>
+    <div class="btns">
+      <button id="btn-add-level">Add level</button>
+      <button id="btn-del-level">Delete level</button>
+    </div>
+  </section>
+
+  <section id="bg-panel">
+    <h2>Floor image</h2>
+    <div id="bg-info" class="muted">No image for this level.</div>
+    <div class="row"><label for="bg-opacity">Opacity</label><input type="range" id="bg-opacity" min="0" max="1" step="0.05" value="0.6"></div>
+    <div class="btns"><button id="btn-load-image">Load image…</button></div>
+  </section>
+
+  <section id="edge-panel">
+    <h2>New edges</h2>
+    <div class="row"><label for="edge-kind">Kind</label>
+      <select id="edge-kind">
+        <option value="walk">walk</option>
+        <option value="stairs">stairs</option>
+        <option value="lift">lift</option>
+        <option value="escalator_up">escalator_up</option>
+        <option value="escalator_down">escalator_down</option>
+      </select></div>
+    <div class="row"><label for="def-mount">Plate height (m)</label><input type="number" step="0.01" id="def-mount" value="1.5"></div>
+    <div class="row"><label for="def-size">Plate frame (m)</label><input type="number" step="0.001" id="def-size" value="0.18"></div>
+  </section>
+
+  <section id="props-panel">
+    <h2>Selection</h2>
+    <div id="props"></div>
+  </section>
+
+  <section id="dest-panel">
+    <h2>Destinations</h2>
+    <table><tbody id="dest-rows"></tbody></table>
+    <div class="btns"><button id="btn-add-dest">Add destination</button></div>
+  </section>
+
+  <section id="validation">
+    <h2>Checks</h2>
+    <div id="val-summary"></div>
+    <ul id="val-list"></ul>
+  </section>
+</aside>
+
+<footer>
+  <span id="cursor">x –, y –</span>
+  <span id="hint"></span>
+</footer>
+
+<script src="map-core.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

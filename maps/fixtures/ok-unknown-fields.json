@@ -1,0 +1,218 @@
+{
+ "schema": 1,
+ "venue": "fixture",
+ "version": 1,
+ "units": "m",
+ "levels": [
+  {
+   "id": "L1",
+   "name": "Level 1",
+   "elevation_m": 0
+  },
+  {
+   "id": "L2",
+   "name": "Level 2",
+   "elevation_m": 5
+  }
+ ],
+ "walkable": [
+  {
+   "level": "L1",
+   "polygon": [
+    [
+     0,
+     0
+    ],
+    [
+     20,
+     0
+    ],
+    [
+     20,
+     4
+    ],
+    [
+     0,
+     4
+    ]
+   ]
+  },
+  {
+   "level": "L1",
+   "polygon": [
+    [
+     16,
+     0
+    ],
+    [
+     20,
+     0
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     16,
+     20
+    ]
+   ]
+  },
+  {
+   "level": "L2",
+   "polygon": [
+    [
+     10,
+     0
+    ],
+    [
+     22,
+     0
+    ],
+    [
+     22,
+     20
+    ],
+    [
+     10,
+     20
+    ]
+   ]
+  }
+ ],
+ "obstacles": [
+  {
+   "level": "L1",
+   "polygon": [
+    [
+     8,
+     3
+    ],
+    [
+     9,
+     3
+    ],
+    [
+     9,
+     3.8
+    ],
+    [
+     8,
+     3.8
+    ]
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "id": "a",
+   "level": "L1",
+   "x": 1,
+   "y": 2,
+   "label": "entrance"
+  },
+  {
+   "id": "b",
+   "level": "L1",
+   "x": 18,
+   "y": 2
+  },
+  {
+   "id": "c",
+   "level": "L1",
+   "x": 18,
+   "y": 15
+  },
+  {
+   "id": "d",
+   "level": "L2",
+   "x": 18,
+   "y": 8
+  },
+  {
+   "id": "e",
+   "level": "L1",
+   "x": 17,
+   "y": 18
+  },
+  {
+   "id": "f",
+   "level": "L2",
+   "x": 17,
+   "y": 18
+  }
+ ],
+ "edges": [
+  {
+   "from": "a",
+   "to": "b",
+   "kind": "walk"
+  },
+  {
+   "from": "b",
+   "to": "c",
+   "kind": "walk"
+  },
+  {
+   "from": "c",
+   "to": "d",
+   "kind": "escalator_up"
+  },
+  {
+   "from": "c",
+   "to": "e",
+   "kind": "walk"
+  },
+  {
+   "from": "e",
+   "to": "f",
+   "kind": "lift"
+  },
+  {
+   "from": "d",
+   "to": "f",
+   "kind": "walk"
+  }
+ ],
+ "anchors": [
+  {
+   "id": "A1",
+   "level": "L1",
+   "x": 0,
+   "y": 2,
+   "mount_height_m": 1.5,
+   "facing_deg": 90,
+   "size_m": 0.18
+  }
+ ],
+ "checkpoints": [
+  {
+   "id": "C1",
+   "level": "L1",
+   "x": 10,
+   "y": 2,
+   "heading_deg": 90
+  }
+ ],
+ "destinations": [
+  {
+   "id": "D1",
+   "name": "Lift L2",
+   "node": "f"
+  }
+ ],
+ "backgrounds": [
+  {
+   "level": "L1",
+   "image": "l1.png",
+   "px_per_m": 12.5,
+   "origin_px": [
+    140,
+    820
+   ]
+  }
+ ],
+ "extra_top": {
+  "note": "kept"
+ }
+}

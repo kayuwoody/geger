@@ -30,6 +30,9 @@ that measures how well a phone can track a shopper indoors, plus the tools aroun
 Gradle root is `android/`. From there: `./gradlew test` (all unit tests), `./gradlew :app:assembleDebug`
 (APK; needs Android SDK platform 37 via `local.properties` `sdk.dir`). Map check:
 `./gradlew -q :replay-cli:run --args="validate-map ../maps/sample/map.json"`.
+Map editor (`tools/map-editor`, open `index.html`): unit tests `node --test tools/map-editor/test/*.test.js`,
+browser test `node tools/map-editor/test/e2e.js <out-dir>` (needs Playwright). Kotlin and JS validators must
+agree on `maps/fixtures/` (ok-* load, bad-* rejected) — add a fixture to both when changing a rule.
 Work on a branch per milestone; merge to `main` when its checks pass.
 
 ## Test devices
@@ -39,7 +42,7 @@ Samsung Galaxy S22 Ultra and S23 Ultra (ARCore supported). No iPhone in Phase 0.
 ## Milestone status
 
 - [x] M1 repo and core model
-- [ ] M2 map editor
+- [x] M2 map editor (automated checks pass; owner still to build the office dry-run map from a real photo)
 - [ ] M3 sensor recorder and logging
 - [ ] M4 plates, QR fix and calibration mode
 - [ ] M5 estimators and 2D map
