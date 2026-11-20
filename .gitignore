@@ -1,0 +1,23 @@
+# Gradle / Android build output
+.gradle/
+build/
+*.apk
+*.aab
+
+# Machine-specific Android SDK path (each machine writes its own)
+local.properties
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.kotlin/
+
+# Python (tools/plates, tools/analysis)
+__pycache__/
+*.pyc
+.venv/
+
+# OS clutter
+.DS_Store
+Thumbs.db

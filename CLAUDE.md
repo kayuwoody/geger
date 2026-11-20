@@ -25,13 +25,20 @@ that measures how well a phone can track a shopper indoors, plus the tools aroun
 - **One JSON config** for every tunable number, logged at session start.
 - Units: metres / seconds / degrees in files and UI; radians inside maths code.
 
+## Build
+
+Gradle root is `android/`. From there: `./gradlew test` (all unit tests), `./gradlew :app:assembleDebug`
+(APK; needs Android SDK platform 37 via `local.properties` `sdk.dir`). Map check:
+`./gradlew -q :replay-cli:run --args="validate-map ../maps/sample/map.json"`.
+Work on a branch per milestone; merge to `main` when its checks pass.
+
 ## Test devices
 
 Samsung Galaxy S22 Ultra and S23 Ultra (ARCore supported). No iPhone in Phase 0.
 
 ## Milestone status
 
-- [ ] M1 repo and core model
+- [x] M1 repo and core model
 - [ ] M2 map editor
 - [ ] M3 sensor recorder and logging
 - [ ] M4 plates, QR fix and calibration mode

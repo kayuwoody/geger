@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "venue": "sample-two-level",
+  "version": 1,
+  "units": "m",
+  "levels": [
+    {"id": "L1", "name": "Level 1", "elevation_m": 0.0},
+    {"id": "L2", "name": "Level 2", "elevation_m": 5.0}
+  ],
+  "walkable": [
+    {"level": "L1", "polygon": [[0, 0], [40, 0], [40, 4], [0, 4]]},
+    {"level": "L1", "polygon": [[36, 0], [40, 0], [40, 30], [36, 30]]},
+    {"level": "L2", "polygon": [[30, 0], [42, 0], [42, 30], [30, 30]]}
+  ],
+  "obstacles": [
+    {"level": "L1", "polygon": [[18, 2.8], [20, 2.8], [20, 3.6], [18, 3.6]]}
+  ],
+  "nodes": [
+    {"id": "n1", "level": "L1", "x": 2.0, "y": 2.0},
+    {"id": "n2", "level": "L1", "x": 38.0, "y": 2.0},
+    {"id": "n8", "level": "L1", "x": 37.0, "y": 20.0},
+    {"id": "n3", "level": "L1", "x": 38.0, "y": 25.0},
+    {"id": "n9", "level": "L1", "x": 39.0, "y": 28.0},
+    {"id": "n6", "level": "L2", "x": 38.0, "y": 15.0},
+    {"id": "n7", "level": "L2", "x": 34.0, "y": 20.0},
+    {"id": "n10", "level": "L2", "x": 39.0, "y": 28.0}
+  ],
+  "edges": [
+    {"from": "n1", "to": "n2", "kind": "walk"},
+    {"from": "n2", "to": "n8", "kind": "walk"},
+    {"from": "n8", "to": "n3", "kind": "walk"},
+    {"from": "n3", "to": "n9", "kind": "walk"},
+    {"from": "n3", "to": "n6", "kind": "escalator_up"},
+    {"from": "n7", "to": "n8", "kind": "escalator_down"},
+    {"from": "n9", "to": "n10", "kind": "lift"},
+    {"from": "n6", "to": "n7", "kind": "walk"},
+    {"from": "n7", "to": "n10", "kind": "walk"},
+    {"from": "n6", "to": "n10", "kind": "walk"}
+  ],
+  "anchors": [
+    {"id": "A01", "level": "L1", "x": 0.05, "y": 2.0, "mount_height_m": 1.5, "facing_deg": 90, "size_m": 0.18},
+    {"id": "A02", "level": "L1", "x": 40.0, "y": 20.0, "mount_height_m": 1.5, "facing_deg": 270, "size_m": 0.27},
+    {"id": "A03", "level": "L2", "x": 30.05, "y": 20.0, "mount_height_m": 1.5, "facing_deg": 90, "size_m": 0.18}
+  ],
+  "checkpoints": [
+    {"id": "C01", "level": "L1", "x": 10.0, "y": 2.0, "heading_deg": 90},
+    {"id": "C02", "level": "L1", "x": 30.0, "y": 2.0, "heading_deg": 90},
+    {"id": "C03", "level": "L1", "x": 38.0, "y": 10.0, "heading_deg": 0},
+    {"id": "C04", "level": "L2", "x": 36.0, "y": 25.0, "heading_deg": 0}
+  ],
+  "destinations": [
+    {"id": "D1", "name": "Lift lobby, Level 2", "node": "n10"},
+    {"id": "D2", "name": "Escalator, Level 1", "node": "n3"},
+    {"id": "D3", "name": "Start", "node": "n1"}
+  ],
+  "backgrounds": []
+}
