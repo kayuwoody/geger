@@ -12,6 +12,7 @@ import kotlin.system.exitProcess
  * Commands:
  *  - `validate-map <map.json>`    load a map, print errors and warnings, exit 1 if unusable
  *  - `validate-config <config.json>` check a config file and print the full resulting config
+ *  - `check-session <zip|log>`    read a recorded session and confirm its counts and rates (M3 check)
  *  - `replay ...`                 replays a recorded session (arrives in milestone M7)
  *
  * Concept: the CLI is a thin shell. All real work happens in positioning-core, so what the CLI
@@ -31,6 +32,7 @@ fun runCli(args: List<String>, out: (String) -> Unit, err: (String) -> Unit): In
     return when (command) {
         "validate-map" -> validateMap(args.drop(1), out, err)
         "validate-config" -> validateConfig(args.drop(1), out, err)
+        "check-session" -> checkSession(args.drop(1), out, err)
         "replay" -> {
             err("replay is not implemented yet (milestone M7).")
             2
@@ -45,6 +47,7 @@ fun runCli(args: List<String>, out: (String) -> Unit, err: (String) -> Unit): In
 private const val USAGE = """Usage:
   replay-cli validate-map <map.json>
   replay-cli validate-config <config.json>
+  replay-cli check-session <session.zip | session.jsonl.gz | session.jsonl>
   replay-cli replay ...            (milestone M7)"""
 
 /**

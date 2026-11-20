@@ -20,3 +20,11 @@ One line per choice that SPEC.md didn't cover: what was decided, and why. Newest
 - M2: with Snap on, placed points snap to 0.1 m and dragged angles to 1°; exact surveyed values are typed in the Selection panel.
 - M2: a loaded floor image gets a provisional background (origin at its bottom-left corner, 20 px/m) until Scale and Origin are set; the image file itself is not stored, only its name, scale and origin.
 - M2: new plates and checkpoints get ids A01/C01 (zero-padded as in the spec's examples); nodes n1, levels L1, destinations D1.
+- M3: `imu` and `rotation` records carry a stream field `s` ("a"/"g", "game"/"rot") instead of one combined record per sample, because the accelerometer and gyroscope (and the two rotation vectors) report separately with their own timestamps.
+- M3: rotation quaternions are logged in ARCore's (x, y, z, w) order; Android's rotation-vector helper returns (w, x, y, z) and is reordered at the boundary.
+- M3: `arcore_frame` records have `t` = receipt time on the elapsedRealtime clock and `ft` = ARCore's raw capture timestamp; ARCore doesn't document its clock, so the app measures it and writes a `timebase` record (base + offset) at session end. Frames also log `dq`, the display-oriented orientation, for the phone-heading rule.
+- M3: added `timebase` records (one for the camera, one for the sensors) and a self-check screen after each recording: rates within 10% of target, zero drops, both clocks identified. `replay-cli check-session` re-runs the same checks on an exported zip and compares every stream's count with the phone's own totals.
+- M3: ARCore uses the back camera at 30 fps with the largest CPU image available (for the M4 QR reader), BLOCKING update mode, autofocus, horizontal plane finding; no depth or light estimation.
+- M3: the log is written uncompressed during the session (a crash leaves a readable file) and gzipped when the session stops; each session folder also keeps the exact config.json and map.json used.
+- M3: a recording keeps running if the app leaves the screen (sensors continue); camera tracking stops and a note is logged. Requested sensor periods: 10 ms (IMU), 20 ms (rotation, magnetometer), 40 ms (barometer); Android treats these as hints.
+- M3: the app is distributed as a debug APK installed from a file (docs/PHONE_SETUP.md); adb is optional, for crash logs.

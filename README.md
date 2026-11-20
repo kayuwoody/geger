@@ -17,9 +17,10 @@ a plate generator, a replay CLI and an analysis report.
 ```
 android/                 Gradle project (run all Gradle commands from here)
   positioning-core/      plain Kotlin: map model + validation, geometry, routing, frames, config
-  replay-cli/            command-line tool: validates maps today, replays sessions from M7
-  app/                   Android test app (M1: skeleton screen only)
+  replay-cli/            command-line tool: validates maps and configs, checks recorded sessions; replays from M7
+  app/                   Android test app: sensor recorder with checks and export (M3)
 maps/sample/map.json     hand-written two-level sample map used by the tests
+docs/PHONE_SETUP.md      installing the app on the test phones, exporting sessions
 maps/fixtures/           small valid (ok-*) and broken (bad-*) maps shared by the Kotlin and editor tests
 tools/map-editor/        browser map editor: open index.html (see its README)
 tools/                   plate generator (M4), analysis report (M7)
@@ -54,12 +55,17 @@ frames, config, CLI).
 ./gradlew :app:assembleDebug
 ```
 
-Builds the test app APK at `android/app/build/outputs/apk/debug/app-debug.apk`. Install it on a
-phone with USB debugging on:
+Builds the test app APK at `android/app/build/outputs/apk/debug/app-debug.apk`. To put it on a
+phone (from a file, or with adb), follow [`docs/PHONE_SETUP.md`](docs/PHONE_SETUP.md).
+
+## Check a recorded session
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+./gradlew -q :replay-cli:run --args="check-session /path/to/session-YYYYMMDD-HHMMSS.zip"
 ```
+
+Reads the exported zip, confirms every stream's record count matches the phone's own totals, and
+prints rates against target and the clock checks. Ends with `RESULT: PASS` or the problems found.
 
 ## Check a map file
 

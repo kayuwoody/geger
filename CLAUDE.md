@@ -33,6 +33,8 @@ Gradle root is `android/`. From there: `./gradlew test` (all unit tests), `./gra
 Map editor (`tools/map-editor`, open `index.html`): unit tests `node --test tools/map-editor/test/*.test.js`,
 browser test `node tools/map-editor/test/e2e.js <out-dir>` (needs Playwright). Kotlin and JS validators must
 agree on `maps/fixtures/` (ok-* load, bad-* rejected) — add a fixture to both when changing a rule.
+Session check on the laptop: `./gradlew -q :replay-cli:run --args="check-session <session.zip>"`.
+Phone install and setup steps for the owner: `docs/PHONE_SETUP.md`.
 Work on a branch per milestone; merge to `main` when its checks pass.
 
 ## Test devices
@@ -43,7 +45,7 @@ Samsung Galaxy S22 Ultra and S23 Ultra (ARCore supported). No iPhone in Phase 0.
 
 - [x] M1 repo and core model
 - [x] M2 map editor (automated checks pass; owner still to build the office dry-run map from a real photo)
-- [ ] M3 sensor recorder and logging
+- [ ] M3 sensor recorder and logging (built and unit-tested; on-device desk check on S23/S22 Ultra pending)
 - [ ] M4 plates, QR fix and calibration mode
 - [ ] M5 estimators and 2D map
 - [ ] M6 AR overlay

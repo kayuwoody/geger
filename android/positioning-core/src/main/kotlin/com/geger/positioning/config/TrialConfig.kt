@@ -153,4 +153,10 @@ data class TrialConfig(
 
     /** The full config as pretty-printed JSON (every field, including defaults). */
     fun toJson(): String = writer.encodeToString(serializer(), this)
+
+    /** The full config as single-line JSON, for embedding in a log record. */
+    fun toCompactJson(): String = compactWriter.encodeToString(serializer(), this)
 }
+
+/** Single-line writer for [TrialConfig.toCompactJson] (every field, no line breaks). */
+private val compactWriter = Json { encodeDefaults = true }
