@@ -25,6 +25,9 @@ android {
         targetSdk = 37
         versionCode = 4
         versionName = "0.4.0-m4"
+        // Both test phones (S22/S23 Ultra) are 64-bit ARM; leaving out other chip types roughly
+        // halves the APK (ARCore and ML Kit ship native code per type).
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     compileOptions {
