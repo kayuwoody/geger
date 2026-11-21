@@ -73,7 +73,7 @@ internal fun checkSession(args: List<String>, out: (String) -> Unit, err: (Strin
     val dropped = e?.get("dropped_so_far")?.jsonPrimitive?.longOrNull ?: 0L
     if (dropped > 0) problems += "$dropped records were dropped on the phone"
 
-    out("Rates (target ±10%):")
+    out("Rates (target +/-10%):")
     for (r in RateCheck.check(counts, duration)) {
         out(String.format(Locale.ROOT, "  %s %-14s %7.1f Hz (target %.0f)", if (r.ok) "OK  " else "FAIL", r.stream, r.hz, r.targetHz))
         if (!r.ok) problems += "rate ${r.stream} is ${"%.1f".format(Locale.ROOT, r.hz)} Hz, target ${r.targetHz.toInt()}"
@@ -82,7 +82,8 @@ internal fun checkSession(args: List<String>, out: (String) -> Unit, err: (Strin
 
     for (tb in timebases) {
         val base = tb.str("base")
-        out("Clock for ${tb.str("stream")}: $base (median delay ${tb.str("median_delay_ms")} ms)")
+        val delay = tb["median_delay_ms"]?.jsonPrimitive?.doubleOrNull
+        out("Clock for ${tb.str("stream")}: $base (median delay ${if (delay != null) String.format(Locale.ROOT, "%.1f", delay) else "?"} ms)")
         if (base == "UNKNOWN") problems += "clock for ${tb.str("stream")} could not be identified"
     }
     if (timebases.isEmpty() && e != null) problems += "no timebase records"

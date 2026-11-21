@@ -45,7 +45,7 @@ Samsung Galaxy S22 Ultra and S23 Ultra (ARCore supported). No iPhone in Phase 0.
 
 - [x] M1 repo and core model
 - [x] M2 map editor (automated checks pass; owner still to build the office dry-run map from a real photo)
-- [ ] M3 sensor recorder and logging (built and unit-tested; on-device desk check on S23/S22 Ultra pending)
+- [x] M3 sensor recorder and logging (desk check passed on S23 Ultra 2026-11-21; S22 Ultra run still to do)
 - [ ] M4 plates, QR fix and calibration mode
 - [ ] M5 estimators and 2D map
 - [ ] M6 AR overlay
