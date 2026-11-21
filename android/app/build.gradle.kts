@@ -1,7 +1,7 @@
 /*
  * :app — the Android test app for the positioning trial.
  *
- * Milestone M3: records every sensor the positioning needs (ARCore camera pose, IMU, rotation
+ * Milestones M3–M4: reads QR plates and computes position fixes from them (M4), and records every sensor the positioning needs (ARCore camera pose, IMU, rotation
  * vectors, magnetometer, barometer, steps, proximity/light) into a session log, checks sensor rates
  * and clocks at the end, and exports sessions as zip files. Later milestones add the QR fix (M4),
  * the estimators and map (M5) and the AR overlay (M6). See SPEC.md, "Milestones".
@@ -23,8 +23,8 @@ android {
         // Android 10+. The S22/S23 Ultra run far newer; this just keeps ARCore and the camera APIs simple.
         minSdk = 29
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0-m3"
+        versionCode = 4
+        versionName = "0.4.0-m4"
     }
 
     compileOptions {
@@ -41,6 +41,8 @@ dependencies {
     implementation(project(":positioning-core"))
 
     implementation(libs.arcore)
+    // QR reading, with the model bundled in the app (works offline).
+    implementation(libs.mlkit.barcode)
     implementation(libs.androidx.core.ktx)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

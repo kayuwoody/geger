@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
     private var carryMode by mutableStateOf("flat")
     private var tester by mutableStateOf("")
     private var notes by mutableStateOf("")
+    private var plateSizeCm by mutableStateOf("18.0")
     private var config by mutableStateOf(TrialConfig.defaults())
     private var configInfo by mutableStateOf("Built-in defaults")
     private var map by mutableStateOf<LoadedMap?>(null)
@@ -119,7 +120,12 @@ class MainActivity : ComponentActivity() {
                         delay(500)
                     }
                 }
-                RecordingScreen(ar.view, live, onNote = { recorder?.note(it) }, onStop = { stopRecording("user") })
+                RecordingScreen(
+                    ar.view, live, runType,
+                    onNote = { recorder?.note(it) },
+                    onCalibrate = { d, a -> recorder?.startCalibration(com.geger.trial.qr.CalibSpot(null, d, a)) },
+                    onStop = { stopRecording("user") },
+                )
             }
             is Screen.Busy -> BusyScreen(s.text)
             is Screen.Summary -> {
@@ -147,7 +153,7 @@ class MainActivity : ComponentActivity() {
         },
         arReady = arStatus == ArStatus.Ready,
         permissionsOk = permissionsOk,
-        runType = runType, carryMode = carryMode, tester = tester, notes = notes,
+        runType = runType, carryMode = carryMode, tester = tester, notes = notes, plateSizeCm = plateSizeCm,
         mapInfo = map?.let { "${it.map.venue} v${it.map.version} · ${it.map.levels.size} level(s), ${it.map.anchors.size} plate(s), ${it.map.checkpoints.size} checkpoint(s)" }
             ?: "No map (not needed for a desk test)",
         mapWarnings = map?.warnings.orEmpty(),
@@ -160,6 +166,7 @@ class MainActivity : ComponentActivity() {
         onCarryMode = { carryMode = it },
         onTester = { tester = it },
         onNotes = { notes = it },
+        onPlateSize = { plateSizeCm = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
         onGrantPermissions = ::requestPermissions,
         onChooseMap = { message = null; pickMap.launch(arrayOf("*/*")) },
         onClearMap = { mapStore.clear(); map = null },
@@ -202,8 +209,10 @@ class MainActivity : ComponentActivity() {
     private fun startRecording() {
         message = null
         if (arStatus != ArStatus.Ready) { message = "AR is not ready yet."; return }
+        val plateM = plateSizeCm.toDoubleOrNull()?.takeIf { it in 5.0..100.0 }?.div(100)
+        if (plateM == null) { message = "Enter the plate frame size in cm (5–100)."; return }
         val r = try {
-            SessionRecorder(this, SessionSetup(runType, carryMode, tester.trim(), notes.trim()), config, map, ar.cameraInfo)
+            SessionRecorder(this, SessionSetup(runType, carryMode, tester.trim(), notes.trim(), plateM), config, map, ar.cameraInfo)
         } catch (e: Exception) {
             message = "Could not start recording: ${e.message}"
             return

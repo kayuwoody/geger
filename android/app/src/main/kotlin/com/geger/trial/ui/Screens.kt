@@ -41,6 +41,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.geger.positioning.log.RateCheck
 import com.geger.positioning.log.TimeBase
 import com.geger.positioning.log.TimebaseResult
+import com.geger.positioning.qr.QrFix
+import com.geger.trial.recording.CalibStatus
 import com.geger.trial.recording.LiveStats
 import com.geger.trial.recording.SessionSummary
 import com.geger.trial.recording.StoredSession
@@ -90,6 +92,7 @@ data class SetupState(
     val carryMode: String,
     val tester: String,
     val notes: String,
+    val plateSizeCm: String,
     val mapInfo: String,
     val mapWarnings: List<String>,
     val configInfo: String,
@@ -102,6 +105,7 @@ class SetupActions(
     val onCarryMode: (String) -> Unit,
     val onTester: (String) -> Unit,
     val onNotes: (String) -> Unit,
+    val onPlateSize: (String) -> Unit,
     val onGrantPermissions: () -> Unit,
     val onChooseMap: () -> Unit,
     val onClearMap: () -> Unit,
@@ -118,7 +122,7 @@ fun SetupScreen(s: SetupState, a: SetupActions) {
         Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),
     ) {
         Text("Geger positioning trial", style = MaterialTheme.typography.headlineSmall)
-        Text("Milestone M3 · sensor recorder", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Milestone M4 · QR plates", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         SectionTitle("Phone")
         Text("AR: ${s.arStatus}", color = if (s.arReady) Good else MaterialTheme.colorScheme.onSurface)
@@ -128,13 +132,20 @@ fun SetupScreen(s: SetupState, a: SetupActions) {
         }
 
         SectionTitle("Run type")
-        Choices(listOf("desk_test" to "Desk test", "route_walk" to "Route", "free_walk" to "Free walk"), s.runType, a.onRunType)
+        Choices(listOf("desk_test" to "Desk", "qr_calibration" to "Plates", "route_walk" to "Route", "free_walk" to "Free"), s.runType, a.onRunType)
         SectionTitle("Carry mode (planned)")
         Choices(listOf("up" to "Up", "flat" to "Flat", "pocket" to "Pocket", "mixed" to "Mixed"), s.carryMode, a.onCarryMode)
 
         SectionTitle("Tester and notes")
         OutlinedTextField(s.tester, { a.onTester(it.take(8)) }, label = { Text("Initials") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(s.notes, a.onNotes, label = { Text("Notes (optional)") }, modifier = Modifier.fillMaxWidth())
+
+        SectionTitle("QR plates")
+        OutlinedTextField(
+            s.plateSizeCm, a.onPlateSize, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            label = { Text("Frame size for plates not on the map (cm)") },
+            supportingText = { Text("Measure the black frame's outer edge with a ruler.") },
+        )
 
         SectionTitle("Map")
         Text(s.mapInfo)
@@ -166,9 +177,18 @@ fun SetupScreen(s: SetupState, a: SetupActions) {
  * Note / Stop buttons at the bottom.
  */
 @Composable
-fun RecordingScreen(view: GLSurfaceView, live: LiveStats?, onNote: (String) -> Unit, onStop: () -> Unit) {
+fun RecordingScreen(
+    view: GLSurfaceView,
+    live: LiveStats?,
+    runType: String,
+    onNote: (String) -> Unit,
+    onCalibrate: (distanceM: Double, angleDeg: Double) -> Unit,
+    onStop: () -> Unit,
+) {
     var noteOpen by remember { mutableStateOf(false) }
     var stopOpen by remember { mutableStateOf(false) }
+    var spotDistance by remember { mutableStateOf(1.0) }
+    var spotAngle by remember { mutableStateOf(0.0) }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
             factory = { view.also { (it.parent as? ViewGroup)?.removeView(it) } },
@@ -186,23 +206,41 @@ fun RecordingScreen(view: GLSurfaceView, live: LiveStats?, onNote: (String) -> U
                 val tracking = if (l.failureReason.isEmpty()) l.trackingState else "${l.trackingState} (${l.failureReason})"
                 Text("AR: $tracking", color = if (l.trackingState == "TRACKING") Color(0xFF8BE28F) else Color(0xFFFFC107))
                 val secs = l.elapsedS.coerceAtLeast(0.001)
-                RateCheck.TARGETS.forEach { (stream, target) ->
-                    val hz = (l.counts[stream] ?: 0L) / secs
-                    Text("$stream ${f(hz)} Hz (target ${f(target, 0)})", color = Color.White, style = MaterialTheme.typography.bodySmall)
-                }
-                listOf("pressure", "step", "proximity_light").forEach { s ->
-                    Text("$s: ${l.counts[s] ?: 0}", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                if (runType == "desk_test") {
+                    RateCheck.TARGETS.forEach { (stream, target) ->
+                        val hz = (l.counts[stream] ?: 0L) / secs
+                        Text("$stream ${f(hz)} Hz (target ${f(target, 0)})", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    }
+                    listOf("pressure", "step", "proximity_light").forEach { s ->
+                        Text("$s: ${l.counts[s] ?: 0}", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    }
+                } else {
+                    val cam = (l.counts["arcore_frame"] ?: 0L) / secs
+                    val imu = (l.counts["imu:a"] ?: 0L) / secs
+                    Text("camera ${f(cam, 0)} Hz · imu ${f(imu, 0)} Hz", color = Color.White, style = MaterialTheme.typography.bodySmall)
                 }
                 if (l.dropped > 0) Text("Dropped records: ${l.dropped}", color = Color(0xFFFF8A80))
+                QrPanel(l)
+                if (runType == "qr_calibration") l.calib?.let { CalibLine(it) }
             }
         }
-        Row(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().safeDrawingPadding().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().safeDrawingPadding().padding(16.dp)) {
+        if (runType == "qr_calibration") {
+            Column(Modifier.fillMaxWidth().background(Color(0xCC000000), MaterialTheme.shapes.medium).padding(8.dp)) {
+                Text("Spot: distance (m) and angle from head-on (°)", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                Choices(listOf(1.0, 2.0, 4.0, 6.0, 8.0, 10.0).map { it.toString() to f(it, 0) }, spotDistance.toString()) { spotDistance = it.toDouble() }
+                Choices(listOf(0.0, 30.0, 50.0, 65.0).map { it.toString() to f(it, 0) }, spotAngle.toString()) { spotAngle = it.toDouble() }
+                Button(onClick = { onCalibrate(spotDistance, spotAngle) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Capture at ${f(spotDistance, 0)} m, ${f(spotAngle, 0)}°")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = { noteOpen = true }, modifier = Modifier.weight(1f).height(56.dp)
                 .background(Color.White, MaterialTheme.shapes.extraLarge)) { Text("Note") }
             Button(onClick = { stopOpen = true }, modifier = Modifier.weight(1f).height(56.dp)) { Text("Stop") }
+        }
         }
     }
     if (noteOpen) {
@@ -223,6 +261,52 @@ fun RecordingScreen(view: GLSurfaceView, live: LiveStats?, onNote: (String) -> U
             dismissButton = { TextButton(onClick = { stopOpen = false }) { Text("Keep recording") } },
         )
     }
+}
+
+/**
+ * The latest QR plate sighting: which plate, distance, angle, fit quality, and either the phone's
+ * map position (plates on the map) or why the fix was rejected.
+ */
+@Composable
+private fun QrPanel(l: LiveStats) {
+    val fix: QrFix = l.lastFix ?: run {
+        Text("QR: no plate seen yet", color = Color.White, style = MaterialTheme.typography.bodySmall)
+        return
+    }
+    val fresh = l.lastFixAgeS < 1.5
+    val colour = when { !fresh -> Color(0xFFBDBDBD); fix.accepted -> Color(0xFF8BE28F); else -> Color(0xFFFFC107) }
+    Text(
+        "QR ${fix.anchorId ?: "?"}: ${f(fix.distanceM, 2)} m · ${f(fix.viewAngleDeg, 0)}° from head-on · rotated ${f(fix.inPlaneRotationDeg, 0)}°",
+        color = colour, fontWeight = FontWeight.Bold,
+    )
+    Text(
+        "frame ${f(fix.frameSidePx, 0)} px · fit ${f(fix.rmsPx, 2)} px · tilt ${f(fix.tiltDeg, 1)}° · ${fix.cornerSource}" +
+            if (fresh) "" else " · ${f(l.lastFixAgeS, 0)} s ago",
+        color = Color.White, style = MaterialTheme.typography.bodySmall,
+    )
+    val p = fix.phone
+    when {
+        !fix.accepted -> Text("Rejected: ${fix.rejectReason}", color = Color(0xFFFFC107), style = MaterialTheme.typography.bodySmall)
+        p != null -> Text("Phone on map: x ${f(p.x, 2)} y ${f(p.y, 2)} (±${f(p.sigmaPosM, 2)} m) · heading ${f(p.headingDeg, 0)}° (±${f(p.sigmaHeadingDeg, 0)}°)",
+            color = Color(0xFF8BE28F), style = MaterialTheme.typography.bodySmall)
+        else -> Text("Accepted (plate not on the map, so no map position)", color = Color(0xFF8BE28F), style = MaterialTheme.typography.bodySmall)
+    }
+    Text("${l.acceptedFixes} of ${l.fixes} sightings accepted", color = Color.White, style = MaterialTheme.typography.bodySmall)
+}
+
+/** Progress or result of the current calibration capture. */
+@Composable
+private fun CalibLine(c: CalibStatus) {
+    val spot = "${f(c.spot.distanceM, 0)} m, ${f(c.spot.angleDeg, 0)}°"
+    val text = when {
+        c.done && c.gaveUp -> "Capture at $spot gave up after 10 s with ${c.measured.size} fix(es)"
+        c.done -> {
+            val errPct = (c.meanDistanceM - c.spot.distanceM) / c.spot.distanceM * 100
+            "Captured at $spot: measured ${f(c.meanDistanceM, 2)} m (${if (errPct >= 0) "+" else ""}${f(errPct, 1)}%)"
+        }
+        else -> "Capturing at $spot… ${c.measured.size}/3 — hold the phone steady, aimed at the plate"
+    }
+    Text(text, color = if (c.done && !c.gaveUp) Color(0xFF8BE28F) else Color(0xFFFFC107), fontWeight = FontWeight.Bold)
 }
 
 /** Shown while the log is being finished and compressed. */
@@ -262,6 +346,7 @@ fun SummaryScreen(s: SessionSummary, onExport: () -> Unit, onDone: () -> Unit) {
         Text("Sensors: ${timebaseText(s.sensors)}", color = if (s.sensors.base == TimeBase.UNKNOWN) Bad else MaterialTheme.colorScheme.onSurface)
         SectionTitle("Log")
         Text("${s.records} records, ${s.dropped} dropped, ${s.notes} notes", color = if (s.dropped > 0) Bad else MaterialTheme.colorScheme.onSurface)
+        if (s.qrFixes > 0) Text("QR plates: ${s.qrAccepted} of ${s.qrFixes} sightings accepted")
         if (s.missingSensors.isNotEmpty()) Text("Missing sensors: ${s.missingSensors.joinToString()}", color = Bad)
 
         Spacer(Modifier.height(20.dp))

@@ -43,6 +43,7 @@ tasks.test {
     inputs.dir(rootProject.file("../maps"))
     testLogging {
         events("failed")
+        showStandardStreams = System.getenv("GEGER_SHOW_OUTPUT") != null
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }

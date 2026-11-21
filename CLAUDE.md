@@ -34,7 +34,8 @@ Map editor (`tools/map-editor`, open `index.html`): unit tests `node --test tool
 browser test `node tools/map-editor/test/e2e.js <out-dir>` (needs Playwright). Kotlin and JS validators must
 agree on `maps/fixtures/` (ok-* load, bad-* rejected) — add a fixture to both when changing a rule.
 Session check on the laptop: `./gradlew -q :replay-cli:run --args="check-session <session.zip>"`.
-Phone install and setup steps for the owner: `docs/PHONE_SETUP.md`.
+Phone install and setup steps for the owner: `docs/PHONE_SETUP.md`; plate test: `docs/PLATE_TEST.md`.
+Plates: `python3 tools/plates/make_plates.py --ids A01 --size-cm 18 --out plates.pdf` (needs segno, reportlab).
 Work on a branch per milestone; merge to `main` when its checks pass.
 
 ## Test devices
@@ -46,7 +47,7 @@ Samsung Galaxy S22 Ultra and S23 Ultra (ARCore supported). No iPhone in Phase 0.
 - [x] M1 repo and core model
 - [x] M2 map editor (automated checks pass; owner still to build the office dry-run map from a real photo)
 - [x] M3 sensor recorder and logging (desk check passed on S23 Ultra 2026-11-21; S22 Ultra run still to do)
-- [ ] M4 plates, QR fix and calibration mode
+- [ ] M4 plates, QR fix and calibration mode (built; synthetic checks pass; on-device plate test pending, see docs/PLATE_TEST.md)
 - [ ] M5 estimators and 2D map
 - [ ] M6 AR overlay
 - [ ] M7 replay and analysis

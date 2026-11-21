@@ -14,7 +14,12 @@ import com.geger.positioning.log.TimeBase
 import com.geger.positioning.log.TimebaseCheck
 import com.geger.positioning.log.TimebaseResult
 import com.geger.positioning.log.record
+import com.geger.positioning.qr.QrFix
 import com.geger.trial.ar.CameraInfo
+import com.geger.trial.qr.CalibSpot
+import com.geger.trial.qr.QrDetector
+import com.geger.trial.qr.calibPointLine
+import com.geger.trial.qr.qrDetectionLine
 import com.geger.trial.settings.LoadedMap
 import com.google.ar.core.Frame
 import com.google.ar.core.TrackingState
@@ -33,8 +38,17 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPOutputStream
 
-/** What the tester chose on the setup screen; logged in session_start. */
-data class SessionSetup(val runType: String, val carryMode: String, val tester: String, val notes: String)
+/**
+ * What the tester chose on the setup screen; logged in session_start.
+ * [plateSizeM] is the frame size used for plates that aren't on the chosen map (e.g. a desk test).
+ */
+data class SessionSetup(val runType: String, val carryMode: String, val tester: String, val notes: String, val plateSizeM: Double = 0.18)
+
+/** Progress of a calibration capture at one marked spot (shown live, logged as calib_point). */
+data class CalibStatus(val spot: CalibSpot, val measured: List<Double>, val done: Boolean, val gaveUp: Boolean) {
+    /** Mean measured distance, or NaN before any fix. */
+    val meanDistanceM: Double get() = if (measured.isEmpty()) Double.NaN else measured.average()
+}
 
 /** Numbers for the live display while recording. */
 data class LiveStats(
@@ -43,6 +57,12 @@ data class LiveStats(
     val dropped: Long,
     val trackingState: String,
     val failureReason: String,
+    /** The most recent QR sighting's result (accepted or not), and how long ago it was. */
+    val lastFix: QrFix? = null,
+    val lastFixAgeS: Double = Double.NaN,
+    val fixes: Long = 0,
+    val acceptedFixes: Long = 0,
+    val calib: CalibStatus? = null,
 )
 
 /**
@@ -64,6 +84,8 @@ data class SessionSummary(
     val notes: Int,
     val missingSensors: List<String>,
     val error: String?,
+    val qrFixes: Long = 0,
+    val qrAccepted: Long = 0,
 ) {
     val passed: Boolean
         get() = error == null && dropped == 0L && rates.all { it.ok } &&
@@ -80,6 +102,7 @@ data class SessionSummary(
         })
         put("camera_timebase", timebaseJson(camera)); put("sensor_timebase", timebaseJson(sensors))
         put("dropped", dropped); put("records", records); put("file_bytes", fileBytes); put("notes", notes)
+        put("qr_fixes", qrFixes); put("qr_accepted", qrAccepted)
         put("missing_sensors", buildJsonArray { missingSensors.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
         error?.let { put("error", it) }
         put("passed", passed)
@@ -125,6 +148,21 @@ class SessionRecorder(
     @Volatile private var failureReason = ""
     @Volatile private var stopped = false
 
+    // QR plates (M4): every sighting is logged; the latest is shown on screen.
+    private val fixIds = AtomicLong()
+    private val acceptedFixes = AtomicLong()
+    @Volatile private var lastFix: QrFix? = null
+    @Volatile private var lastFixNs = 0L
+    private val qr = QrDetector(config, map?.map, setup.plateSizeM) { fix, sighting, tNs, stamp -> onFix(fix, sighting, tNs, stamp) }
+
+    // Calibration capture in progress (guarded by calibLock).
+    private val calibLock = Any()
+    private var calibSpot: CalibSpot? = null
+    private var calibIds = mutableListOf<Long>()
+    private var calibMeasured = mutableListOf<Double>()
+    private var calibDeadlineNs = 0L
+    private var calibStatus: CalibStatus? = null
+
     init {
         dir.mkdirs()
         File(dir, "config.json").writeText(config.toJson())
@@ -153,6 +191,7 @@ class SessionRecorder(
             .str("device", "${Build.MANUFACTURER} ${Build.MODEL}").str("android", Build.VERSION.RELEASE).int("sdk", Build.VERSION.SDK_INT)
             .str("map_venue", map?.map?.venue).int("map_version", map?.map?.version ?: -1)
             .str("run_type", setup.runType).str("carry_mode", setup.carryMode).str("tester", setup.tester).str("notes", setup.notes)
+            .num("default_plate_size_m", setup.plateSizeM)
             .rawJson("config", config.toCompactJson())
             .rawJson("missing_sensors", missing.joinToString(",", "[", "]") { "\"$it\"" })
         camera?.let {
@@ -191,6 +230,50 @@ class SessionRecorder(
             .build()
         log.offer(RecordType.ARCORE_FRAME, line)
         frames.incrementAndGet()
+        qr.onFrame(frame)
+    }
+
+    /**
+     * One QR sighting's result (called on the QR worker thread): log it, remember it for the
+     * display, and feed an active calibration capture.
+     */
+    private fun onFix(fix: QrFix, sighting: com.geger.positioning.qr.QrSighting, tNs: Long, stamp: Long) {
+        if (stopped) return
+        val id = fixIds.incrementAndGet()
+        log.offer(RecordType.QR_DETECTION, qrDetectionLine(id, tNs, stamp, fix, sighting))
+        if (fix.accepted) acceptedFixes.incrementAndGet()
+        lastFix = fix
+        lastFixNs = SystemClock.elapsedRealtimeNanos()
+        synchronized(calibLock) {
+            val spot = calibSpot ?: return
+            if (!fix.accepted || (spot.anchorId != null && spot.anchorId != fix.anchorId)) return
+            calibIds += id
+            calibMeasured += fix.distanceM
+            if (calibIds.size >= 3) finishCalibration(gaveUp = false)
+            else calibStatus = CalibStatus(spot, calibMeasured.toList(), done = false, gaveUp = false)
+        }
+    }
+
+    /**
+     * Starts collecting fixes at a tape-marked spot: the next 3 accepted fixes (of [spot]'s plate,
+     * if named) within 10 seconds are logged together as a calib_point.
+     */
+    fun startCalibration(spot: CalibSpot) {
+        synchronized(calibLock) {
+            calibSpot = spot
+            calibIds = mutableListOf()
+            calibMeasured = mutableListOf()
+            calibDeadlineNs = SystemClock.elapsedRealtimeNanos() + 10_000_000_000L
+            calibStatus = CalibStatus(spot, emptyList(), done = false, gaveUp = false)
+        }
+    }
+
+    /** Logs the calib_point and ends the capture (caller holds calibLock). */
+    private fun finishCalibration(gaveUp: Boolean) {
+        val spot = calibSpot ?: return
+        log.offer(RecordType.CALIB_POINT, calibPointLine(SystemClock.elapsedRealtimeNanos(), spot, calibIds, calibMeasured, gaveUp))
+        calibStatus = CalibStatus(spot, calibMeasured.toList(), done = true, gaveUp = gaveUp)
+        calibSpot = null
     }
 
     /** Logs a free-text note from the tester ("crowd", "shiny floor"...). */
@@ -200,10 +283,18 @@ class SessionRecorder(
         notes.incrementAndGet()
     }
 
-    /** Current counts for the live display. */
+    /** Current counts for the live display (also times out a calibration capture after 10 s). */
     fun snapshot(): LiveStats {
+        val now = SystemClock.elapsedRealtimeNanos()
+        val calib = synchronized(calibLock) {
+            if (calibSpot != null && now > calibDeadlineNs) finishCalibration(gaveUp = true)
+            calibStatus
+        }
         val counts = sensors.counts.mapValues { it.value.get() } + ("arcore_frame" to frames.get())
-        return LiveStats((SystemClock.elapsedRealtimeNanos() - startNs) / 1e9, counts, log.droppedSoFar(), trackingState, failureReason)
+        return LiveStats(
+            (now - startNs) / 1e9, counts, log.droppedSoFar(), trackingState, failureReason,
+            lastFix, if (lastFixNs == 0L) Double.NaN else (now - lastFixNs) / 1e9, fixIds.get(), acceptedFixes.get(), calib,
+        )
     }
 
     /**
@@ -213,6 +304,7 @@ class SessionRecorder(
      */
     fun stop(reason: String): SessionSummary {
         stopped = true
+        qr.close()
         sensors.stop()
         val endNs = SystemClock.elapsedRealtimeNanos()
         val durationS = (endNs - startNs) / 1e9
@@ -228,7 +320,8 @@ class SessionRecorder(
         val countsJson = counts.entries.sortedBy { it.key }.joinToString(",", "{", "}") { "\"${it.key}\":${it.value}" }
         log.offer(RecordType.SESSION_END, record(endNs, RecordType.SESSION_END)
             .num("duration_s", durationS).str("reason", reason).rawJson("counts", countsJson)
-            .int("dropped_so_far", log.droppedSoFar()).int("notes", notes.get()).build())
+            .int("dropped_so_far", log.droppedSoFar()).int("notes", notes.get())
+            .int("qr_fixes", fixIds.get()).int("qr_accepted", acceptedFixes.get()).build())
         val stats = log.close()
 
         var error = log.error()?.let { "Writing the log failed: ${it.message}" }
@@ -242,7 +335,7 @@ class SessionRecorder(
         val summary = SessionSummary(
             id, startedAt, durationS, setup.runType, setup.carryMode, rates, cam, sen,
             stats.dropped, stats.total, dir.walkTopDown().filter { it.isFile }.sumOf { it.length() },
-            notes.get(), sensors.missing.toList(), error,
+            notes.get(), sensors.missing.toList(), error, fixIds.get(), acceptedFixes.get(),
         )
         File(dir, "summary.json").writeText(summary.toJson().toString())
         return summary

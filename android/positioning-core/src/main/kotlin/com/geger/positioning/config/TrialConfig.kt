@@ -29,7 +29,16 @@ data class QrConfig(
     val maxTiltDeg: Double = 10.0,
     /** Gravity check: the chosen pose's plate +y must be within this of world up. */
     val gravityUpToleranceDeg: Double = 20.0,
-    /** Fix position uncertainty: σ = base + perMetre × distance. */
+    /**
+     * Mirror ambiguity gate: reject a fix when the mirror-image vertical pose fits nearly as well —
+     * its extra squared corner error is under minMirrorChi2 × cornerNoisePx² — AND puts the camera
+     * further than maxMirrorSeparationM (or 5% of the distance) from the chosen pose.
+     */
+    val minMirrorChi2: Double = 16.0,
+    val maxMirrorSeparationM: Double = 0.3,
+    /** Assumed 1σ error of each fitted frame corner, in pixels (feeds each fix's uncertainty and the mirror gate). */
+    val cornerNoisePx: Double = 0.5,
+    /** Fix position uncertainty floor: σ = base + perMetre × distance (combined with the per-fix estimate). */
     val sigmaPosBaseM: Double = 0.05,
     val sigmaPosPerMetre: Double = 0.03,
     /** Fix heading uncertainty: σ = base + perMetre × distance. */

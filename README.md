@@ -21,9 +21,11 @@ android/                 Gradle project (run all Gradle commands from here)
   app/                   Android test app: sensor recorder with checks and export (M3)
 maps/sample/map.json     hand-written two-level sample map used by the tests
 docs/PHONE_SETUP.md      installing the app on the test phones, exporting sessions
+docs/PLATE_TEST.md       step-by-step QR plate test (M4)
 maps/fixtures/           small valid (ok-*) and broken (bad-*) maps shared by the Kotlin and editor tests
 tools/map-editor/        browser map editor: open index.html (see its README)
-tools/                   plate generator (M4), analysis report (M7)
+tools/plates/            QR plate PDF generator (see its README)
+tools/analysis/          analysis report (M7)
 ```
 
 ## Requirements

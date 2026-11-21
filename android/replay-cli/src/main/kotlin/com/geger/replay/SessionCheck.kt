@@ -32,6 +32,10 @@ internal fun checkSession(args: List<String>, out: (String) -> Unit, err: (Strin
     var start: JsonObject? = null
     var end: JsonObject? = null
     val timebases = mutableListOf<JsonObject>()
+    val calibPoints = mutableListOf<JsonObject>()
+    var qrSightings = 0
+    var qrAccepted = 0
+    val qrReasons = sortedMapOf<String, Int>()
     val counts = sortedMapOf<String, Long>()
     var firstT = Long.MAX_VALUE
     var lastT = Long.MIN_VALUE
@@ -45,6 +49,16 @@ internal fun checkSession(args: List<String>, out: (String) -> Unit, err: (Strin
                     RecordType.SESSION_START -> start = e.fields
                     RecordType.SESSION_END -> end = e.fields
                     RecordType.TIMEBASE -> timebases += e.fields
+                    RecordType.CALIB_POINT -> calibPoints += e.fields
+                    RecordType.QR_DETECTION -> {
+                        qrSightings++
+                        if (e.fields["accepted"]?.jsonPrimitive?.content == "true") qrAccepted++
+                        else (e.fields["reason"]?.jsonPrimitive?.content ?: "?").substringBefore(" (").let { r ->
+                            // Group by the reason's wording without its numbers.
+                            val key = r.replace(Regex("[0-9.]+"), "#")
+                            qrReasons.merge(key, 1, Int::plus)
+                        }
+                    }
                 }
             }
         }
@@ -87,6 +101,21 @@ internal fun checkSession(args: List<String>, out: (String) -> Unit, err: (Strin
         if (base == "UNKNOWN") problems += "clock for ${tb.str("stream")} could not be identified"
     }
     if (timebases.isEmpty() && e != null) problems += "no timebase records"
+
+    if (qrSightings > 0) {
+        out("QR sightings: $qrSightings, accepted $qrAccepted")
+        qrReasons.forEach { (r, n) -> out("  rejected $n× : $r") }
+    }
+    if (calibPoints.isNotEmpty()) out("Calibration spots (measured distance vs tape):")
+    for (c in calibPoints) {
+        val grid = c["grid_distance_m"]?.jsonPrimitive?.doubleOrNull ?: Double.NaN
+        val angle = c["grid_angle_deg"]?.jsonPrimitive?.doubleOrNull ?: Double.NaN
+        val measured = (c["measured_distance_m"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.jsonPrimitive.doubleOrNull }.orEmpty()
+        val gaveUp = c["gave_up"]?.jsonPrimitive?.content == "true"
+        if (measured.isEmpty()) { out(String.format(Locale.ROOT, "  %5.1f m at %3.0f°: no accepted fixes%s", grid, angle, if (gaveUp) " (gave up)" else "")); continue }
+        val mean = measured.average()
+        out(String.format(Locale.ROOT, "  %5.1f m at %3.0f°: measured %.3f m (%+.1f%%) from %d fix(es)%s", grid, angle, mean, (mean - grid) / grid * 100, measured.size, if (gaveUp) ", gave up early" else ""))
+    }
 
     return if (problems.isEmpty()) {
         out("RESULT: PASS")

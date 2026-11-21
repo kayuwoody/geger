@@ -26,6 +26,10 @@ object RecordType {
     const val NOTE = "note"
     /** How ARCore's frame timestamps relate to the sensor time base (written at session end). */
     const val TIMEBASE = "timebase"
+    /** One QR plate sighting and the fix computed from it, accepted or not (M4). */
+    const val QR_DETECTION = "qr_detection"
+    /** A QR calibration spot: true distance/angle marked on the floor and the fixes collected there. */
+    const val CALIB_POINT = "calib_point"
 }
 
 /**
