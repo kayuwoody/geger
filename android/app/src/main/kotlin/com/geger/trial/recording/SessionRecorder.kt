@@ -63,6 +63,7 @@ data class LiveStats(
     val fixes: Long = 0,
     val acceptedFixes: Long = 0,
     val calib: CalibStatus? = null,
+    val radio: RadioLive? = null,
 )
 
 /**
@@ -86,6 +87,10 @@ data class SessionSummary(
     val error: String?,
     val qrFixes: Long = 0,
     val qrAccepted: Long = 0,
+    /** Records per radio stream (ble, wifi_scan, wifi_rtt, gnss_fix, gnss_status). */
+    val radioCounts: Map<String, Long> = emptyMap(),
+    /** Distinct beacons heard. */
+    val beaconsHeard: Int = 0,
 ) {
     val passed: Boolean
         get() = error == null && dropped == 0L && rates.all { it.ok } &&
@@ -103,6 +108,7 @@ data class SessionSummary(
         put("camera_timebase", timebaseJson(camera)); put("sensor_timebase", timebaseJson(sensors))
         put("dropped", dropped); put("records", records); put("file_bytes", fileBytes); put("notes", notes)
         put("qr_fixes", qrFixes); put("qr_accepted", qrAccepted)
+        put("radio_counts", buildJsonObject { radioCounts.forEach { (k, v) -> put(k, v) } }); put("beacons_heard", beaconsHeard)
         put("missing_sensors", buildJsonArray { missingSensors.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
         error?.let { put("error", it) }
         put("passed", passed)
@@ -153,6 +159,9 @@ class SessionRecorder(
     private val acceptedFixes = AtomicLong()
     @Volatile private var lastFix: QrFix? = null
     @Volatile private var lastFixNs = 0L
+    private val radios = RadioRecorder(
+        context, config.radio, map?.map?.beacons?.values?.associate { it.key to it.id }.orEmpty(),
+    ) { type, line -> log.offer(type, line) }
     private val qr = QrDetector(config, map?.map, setup.plateSizeM) { fix, sighting, tNs, stamp -> onFix(fix, sighting, tNs, stamp) }
 
     // Calibration capture in progress (guarded by calibLock).
@@ -172,6 +181,7 @@ class SessionRecorder(
         log.offer(RecordType.SESSION_START, sessionStartRecord(missing))
         sensors = SensorRecorder(sensorManager) { type, line -> log.offer(type, line) }
         sensors.start() // also fills sensors.missing with the same list
+        radios.start()
     }
 
     /** Sensors this phone doesn't have (checked before starting so session_start can list them). */
@@ -294,6 +304,7 @@ class SessionRecorder(
         return LiveStats(
             (now - startNs) / 1e9, counts, log.droppedSoFar(), trackingState, failureReason,
             lastFix, if (lastFixNs == 0L) Double.NaN else (now - lastFixNs) / 1e9, fixIds.get(), acceptedFixes.get(), calib,
+            radios.live(),
         )
     }
 
@@ -305,10 +316,13 @@ class SessionRecorder(
     fun stop(reason: String): SessionSummary {
         stopped = true
         qr.close()
+        val radioLive = radios.live()
+        radios.stop()
         sensors.stop()
         val endNs = SystemClock.elapsedRealtimeNanos()
         val durationS = (endNs - startNs) / 1e9
-        val counts = sensors.counts.mapValues { it.value.get() } + ("arcore_frame" to frames.get())
+        val radioCounts = radios.counts.mapValues { it.value.get() }
+        val counts = sensors.counts.mapValues { it.value.get() } + ("arcore_frame" to frames.get()) + radioCounts
         val rates = RateCheck.check(counts, durationS)
         val cam = cameraTimebase.result()
         val sen = sensors.timebase.result()
@@ -336,6 +350,7 @@ class SessionRecorder(
             id, startedAt, durationS, setup.runType, setup.carryMode, rates, cam, sen,
             stats.dropped, stats.total, dir.walkTopDown().filter { it.isFile }.sumOf { it.length() },
             notes.get(), sensors.missing.toList(), error, fixIds.get(), acceptedFixes.get(),
+            radioCounts, radioLive.beaconsHeard,
         )
         File(dir, "summary.json").writeText(summary.toJson().toString())
         return summary

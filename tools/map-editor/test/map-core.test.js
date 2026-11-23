@@ -86,3 +86,14 @@ test('nextId finds the first free number', () => {
   assert.equal(core.nextId('n', []), 'n1');
   assert.equal(core.nextId('n', ['n1', 'n2', 'n4']), 'n3');
 });
+
+test('beacon rules match the Kotlin loader', () => {
+  const load = name => core.validateMap(JSON.parse(fs.readFileSync(path.join(fixturesDir, name), 'utf8')));
+  assert.deepEqual(load('ok-full.json').errors, []);
+  mentions(load('bad-beacon-uuid.json').errors, "beacons[0] 'B01'", 'uuid must look like');
+  mentions(load('bad-beacon-duplicate-identity.json').errors, "'B01', 'B02'", 'share the identity');
+  mentions(load('bad-beacon-major-range.json').errors, 'major must be 0–65535');
+  mentions(load('bad-beacon-unknown-level.json').errors, "unknown level 'L7'");
+  // Beacons hang on walls: no walkability warning even outside walkable space.
+  assert.ok(!load('ok-full.json').warnings.some(w => w.includes('beacon')));
+});

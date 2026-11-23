@@ -67,6 +67,25 @@ data class Destination(val id: String, val name: String, val nodeId: String)
 /** A floor image: [pxPerM] pixels per metre, [originPx] = pixel position of the map origin. */
 data class Background(val levelId: String, val image: String, val pxPerM: Double, val originPx: Vec2)
 
+/**
+ * A Bluetooth beacon: [position] on the plan, [heightM] above its level's floor, and its iBeacon
+ * identity. [key] ("UUID:major:minor", UUID upper-case) is how a heard broadcast is matched to it.
+ */
+data class Beacon(
+    val id: String,
+    val levelId: String,
+    val position: Vec2,
+    val heightM: Double,
+    val uuid: String,
+    val major: Int,
+    val minor: Int,
+) {
+    val key: String get() = beaconKey(uuid, major, minor)
+}
+
+/** The lookup key for an iBeacon identity: upper-case UUID, major and minor joined by ':'. */
+fun beaconKey(uuid: String, major: Int, minor: Int) = "${uuid.uppercase()}:$major:$minor"
+
 /** A fully validated venue map. Build it with [MapLoader]; never construct one by hand in app code. */
 data class VenueMap(
     val schema: Int,
@@ -81,7 +100,11 @@ data class VenueMap(
     val checkpoints: Map<String, Checkpoint>,
     val destinations: Map<String, Destination>,
     val backgrounds: List<Background>,
+    val beacons: Map<String, Beacon> = emptyMap(),
 ) {
+    /** Beacons by their identity key (see [beaconKey]), for matching what the phone hears. */
+    val beaconsByKey: Map<String, Beacon> by lazy { beacons.values.associateBy { it.key } }
+
     /** The level with [id]. Throws if missing, which cannot happen for a validated map's own ids. */
     fun level(id: String): Level = levels.getValue(id)
 

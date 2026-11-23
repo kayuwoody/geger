@@ -31,6 +31,7 @@ data class MapFile(
     val checkpoints: List<CheckpointFile> = emptyList(),
     val destinations: List<DestinationFile> = emptyList(),
     val backgrounds: List<BackgroundFile> = emptyList(),
+    val beacons: List<BeaconFile> = emptyList(),
 )
 
 /** A floor. `elevation_m` is its floor height above the lowest mapped level. */
@@ -102,4 +103,20 @@ data class BackgroundFile(
     val image: String,
     @SerialName("px_per_m") val pxPerM: Double,
     @SerialName("origin_px") val originPx: List<Double>,
+)
+
+/**
+ * A Bluetooth beacon on the route: where it hangs and its iBeacon identity (uuid, major, minor),
+ * which is what the phone hears.
+ */
+@Serializable
+data class BeaconFile(
+    val id: String,
+    val level: String,
+    val x: Double,
+    val y: Double,
+    @SerialName("height_m") val heightM: Double,
+    val uuid: String,
+    val major: Int,
+    val minor: Int,
 )

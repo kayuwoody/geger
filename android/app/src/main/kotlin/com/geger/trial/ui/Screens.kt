@@ -88,6 +88,8 @@ data class SetupState(
     val arStatus: String,
     val arReady: Boolean,
     val permissionsOk: Boolean,
+    val radioInfo: String,
+    val radiosOk: Boolean,
     val runType: String,
     val carryMode: String,
     val tester: String,
@@ -122,12 +124,13 @@ fun SetupScreen(s: SetupState, a: SetupActions) {
         Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),
     ) {
         Text("Geger positioning trial", style = MaterialTheme.typography.headlineSmall)
-        Text("Milestone M4 · QR plates", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Milestone M4b · QR plates and radios", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         SectionTitle("Phone")
         Text("AR: ${s.arStatus}", color = if (s.arReady) Good else MaterialTheme.colorScheme.onSurface)
-        if (!s.permissionsOk) {
-            Text("Camera and step-counter permissions are needed.", color = Bad)
+        Text(s.radioInfo, color = if (s.radiosOk) Good else Color(0xFF8A5A00), style = MaterialTheme.typography.bodySmall)
+        if (!s.permissionsOk || !s.radiosOk) {
+            if (!s.permissionsOk) Text("Camera and step-counter permissions are needed.", color = Bad)
             OutlinedButton(onClick = a.onGrantPermissions) { Text("Grant permissions") }
         }
 
@@ -220,6 +223,7 @@ fun RecordingScreen(
                     Text("camera ${f(cam, 0)} Hz · imu ${f(imu, 0)} Hz", color = Color.White, style = MaterialTheme.typography.bodySmall)
                 }
                 if (l.dropped > 0) Text("Dropped records: ${l.dropped}", color = Color(0xFFFF8A80))
+                l.radio?.let { RadioLine(it) }
                 QrPanel(l)
                 if (runType == "qr_calibration") l.calib?.let { CalibLine(it) }
             }
@@ -294,6 +298,16 @@ private fun QrPanel(l: LiveStats) {
     Text("${l.acceptedFixes} of ${l.fixes} sightings accepted", color = Color.White, style = MaterialTheme.typography.bodySmall)
 }
 
+/** One line per radio: beacons heard, Wi-Fi, GPS. */
+@Composable
+private fun RadioLine(r: com.geger.trial.recording.RadioLive) {
+    val ble = if (r.beaconsHeard == 0) "no beacons" else "${r.beaconsHeard} beacon(s), strongest ${r.strongestBeacon} ${r.strongestRssi} dBm"
+    val wifi = "Wi-Fi ${r.wifiAps} APs" + (if (r.rttCapable > 0) ", ${r.rttCapable} ranging" else "") + " (${r.wifiScans} scans)"
+    val gps = "GPS ${r.gnssUsed}/${r.gnssVisible} sats" + if (r.gnssAccuracyM.isFinite()) " ±${f(r.gnssAccuracyM, 0)} m" else ""
+    Text("BT: $ble", color = Color.White, style = MaterialTheme.typography.bodySmall)
+    Text("$wifi · $gps", color = Color.White, style = MaterialTheme.typography.bodySmall)
+}
+
 /** Progress or result of the current calibration capture. */
 @Composable
 private fun CalibLine(c: CalibStatus) {
@@ -347,6 +361,11 @@ fun SummaryScreen(s: SessionSummary, onExport: () -> Unit, onDone: () -> Unit) {
         SectionTitle("Log")
         Text("${s.records} records, ${s.dropped} dropped, ${s.notes} notes", color = if (s.dropped > 0) Bad else MaterialTheme.colorScheme.onSurface)
         if (s.qrFixes > 0) Text("QR plates: ${s.qrAccepted} of ${s.qrFixes} sightings accepted")
+        SectionTitle("Radios")
+        val rc = s.radioCounts
+        Text("Bluetooth: ${rc["ble"] ?: 0} broadcasts from ${s.beaconsHeard} beacon(s)")
+        Text("Wi-Fi: ${rc["wifi_scan"] ?: 0} scans, ${rc["wifi_rtt"] ?: 0} ranging rounds")
+        Text("GPS: ${rc["gnss_fix"] ?: 0} fixes, ${rc["gnss_status"] ?: 0} satellite updates")
         if (s.missingSensors.isNotEmpty()) Text("Missing sensors: ${s.missingSensors.joinToString()}", color = Bad)
 
         Spacer(Modifier.height(20.dp))

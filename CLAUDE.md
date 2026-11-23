@@ -22,6 +22,7 @@ that measures how well a phone can track a shopper indoors, plus the tools aroun
 - **Coordinate conventions in SPEC.md are binding.** Convert library conventions at the boundary
   in one named, unit-tested function.
 - **No network, no backend, no camera images by default** (PDPA: shoppers appear in frame).
+  Bluetooth logs only our beacon formats; Wi-Fi BSSIDs are hashed unless allow-listed.
 - **One JSON config** for every tunable number, logged at session start.
 - Units: metres / seconds / degrees in files and UI; radians inside maths code.
 
@@ -34,7 +35,7 @@ Map editor (`tools/map-editor`, open `index.html`): unit tests `node --test tool
 browser test `node tools/map-editor/test/e2e.js <out-dir>` (needs Playwright). Kotlin and JS validators must
 agree on `maps/fixtures/` (ok-* load, bad-* rejected) — add a fixture to both when changing a rule.
 Session check on the laptop: `./gradlew -q :replay-cli:run --args="check-session <session.zip>"`.
-Phone install and setup steps for the owner: `docs/PHONE_SETUP.md`; plate test: `docs/PLATE_TEST.md`.
+Phone install and setup steps for the owner: `docs/PHONE_SETUP.md`; plate test: `docs/PLATE_TEST.md`; beacons: `docs/BEACON_SETUP.md`.
 Plates: `python3 tools/plates/make_plates.py --ids A01 --size-cm 18 --out plates.pdf` (needs segno, reportlab).
 Work on a branch per milestone; merge to `main` when its checks pass.
 
@@ -48,6 +49,7 @@ Samsung Galaxy S22 Ultra and S23 Ultra (ARCore supported). No iPhone in Phase 0.
 - [x] M2 map editor (automated checks pass; owner still to build the office dry-run map from a real photo)
 - [x] M3 sensor recorder and logging (desk check passed on S23 Ultra 2026-11-21; S22 Ultra run still to do)
 - [ ] M4 plates, QR fix and calibration mode (built; synthetic checks pass; on-device plate test pending, see docs/PLATE_TEST.md)
+- [ ] M4b radio recording: Bluetooth beacons, Wi-Fi, GPS (built; automated checks pass; beacon desk check pending, see docs/BEACON_SETUP.md)
 - [ ] M5 estimators and 2D map
 - [ ] M6 AR overlay
 - [ ] M7 replay and analysis

@@ -184,6 +184,22 @@ object MapLoader {
             if (b.originPx.size != 2 || b.originPx.any { !it.isFinite() }) errors += "$where: origin_px must be [x, y]"
         }
 
+        // ---- Beacons (Bluetooth) ------------------------------------------------------------
+        checkIds("beacons", file.beacons.map { it.id }, errors)
+        val uuidPattern = Regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$")
+        file.beacons.forEachIndexed { i, b ->
+            val where = "beacons[$i] '${b.id}'"
+            checkLevel(where, b.level)
+            if (!b.x.isFinite() || !b.y.isFinite()) errors += "$where: x and y must be finite numbers"
+            if (!(b.heightM >= 0.0) || !b.heightM.isFinite()) errors += "$where: height_m must be zero or more, got ${b.heightM}"
+            if (!uuidPattern.matches(b.uuid)) errors += "$where: uuid must look like D55248B4-8F80-46C8-88AC-EEC9C72B2B7C, got \"${b.uuid}\""
+            if (b.major !in 0..65535) errors += "$where: major must be 0–65535, got ${b.major}"
+            if (b.minor !in 0..65535) errors += "$where: minor must be 0–65535, got ${b.minor}"
+        }
+        file.beacons.groupBy { beaconKey(it.uuid, it.major, it.minor) }.filter { it.value.size > 1 }.forEach { (key, list) ->
+            errors += "beacons: ${list.joinToString { "'${it.id}'" }} share the identity $key (uuid + major + minor must be unique)"
+        }
+
         if (errors.isNotEmpty()) return MapLoadResult.Failed(errors, warnings)
 
         // ---- Build the model ---------------------------------------------------------------
@@ -202,6 +218,9 @@ object MapLoader {
             checkpoints = file.checkpoints.associate { it.id to Checkpoint(it.id, it.level, Vec2(it.x, it.y), it.headingDeg) },
             destinations = file.destinations.associate { it.id to Destination(it.id, it.name, it.node) },
             backgrounds = file.backgrounds.map { Background(it.level, it.image, it.pxPerM, Vec2(it.originPx[0], it.originPx[1])) },
+            beacons = file.beacons.associate {
+                it.id to Beacon(it.id, it.level, Vec2(it.x, it.y), it.heightM, it.uuid.uppercase(), it.major, it.minor)
+            },
         )
 
         // ---- Pass 2: geometry warnings -----------------------------------------------------

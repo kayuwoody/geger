@@ -210,5 +210,27 @@
     820
    ]
   }
+ ],
+ "beacons": [
+  {
+   "id": "B01",
+   "level": "L1",
+   "x": 10.0,
+   "y": 4.0,
+   "height_m": 2.8,
+   "uuid": "D55248B4-8F80-46C8-88AC-EEC9C72B2B7C",
+   "major": 1,
+   "minor": 1
+  },
+  {
+   "id": "B02",
+   "level": "L2",
+   "x": 22.0,
+   "y": 10.0,
+   "height_m": 2.8,
+   "uuid": "d55248b4-8f80-46c8-88ac-eec9c72b2b7c",
+   "major": 2,
+   "minor": 2
+  }
  ]
 }

@@ -31,7 +31,15 @@ There are two ways to put the test app on a phone:
 6. Open **Geger Trial**.
    - When it asks for the **camera**, tap **While using the app**.
    - When it asks for **physical activity** (the step counter), tap **Allow**.
+   - When it asks for **location**, choose **Precise** and **While using the app**. (Android needs
+     this to let the app hear Bluetooth beacons and Wi-Fi; the app keeps no record of who you are.)
+   - When it asks for **nearby devices**, tap **Allow** (Bluetooth beacons and Wi-Fi ranging).
    - If it asks to install or update Google Play Services for AR, accept.
+7. Keep **Bluetooth, Wi-Fi and Location** switched on during recordings. The setup screen shows a
+   **Radios** line; if it lists a problem, tap **Grant** or switch the radio on.
+8. Optional but recommended: Android only allows 4 Wi-Fi scans every 2 minutes. To lift that limit,
+   turn on **Developer options** (see Part 2B, steps 1–3), then in **Developer options** turn off
+   **Wi-Fi scan throttling**.
 
 To update to a newer build later, repeat steps 2–5. Your recorded sessions are kept.
 

@@ -120,6 +120,29 @@ data class DisplayConfig(
     val overlaySmoothingS: Double = 1.0,
 )
 
+/**
+ * Radio recording (milestone M4b): Bluetooth beacons, Wi-Fi and GPS, logged for offline evaluation.
+ *
+ * Privacy (PDPA): only beacon broadcasts are logged from Bluetooth, never other devices; Wi-Fi
+ * access points are logged by a hashed BSSID unless their network name is on [wifiSsidAllowList]
+ * (e.g. the mall's own Wi-Fi), so personal hotspots can't be named.
+ */
+@Serializable
+data class RadioConfig(
+    val bleEnabled: Boolean = true,
+    /** Only log iBeacons with these UUIDs (empty = any iBeacon). Eddystone-UID is always logged. */
+    val bleUuids: List<String> = emptyList(),
+    val wifiEnabled: Boolean = true,
+    /** Seconds between Wi-Fi scan requests (Android allows 4 per 2 minutes unless throttling is off). */
+    val wifiScanIntervalS: Double = 30.0,
+    /** Network names whose BSSIDs and names are logged in clear; everything else is hashed. */
+    val wifiSsidAllowList: List<String> = emptyList(),
+    val wifiRttEnabled: Boolean = true,
+    /** Seconds between Wi-Fi ranging rounds when ranging-capable access points are in range. */
+    val wifiRttIntervalS: Double = 1.0,
+    val gnssEnabled: Boolean = true,
+)
+
 /** Debug logging switches (SPEC.md, "Logging"). */
 @Serializable
 data class LoggingConfig(
@@ -138,6 +161,7 @@ data class TrialConfig(
     val phoneMode: PhoneModeConfig = PhoneModeConfig(),
     val display: DisplayConfig = DisplayConfig(),
     val logging: LoggingConfig = LoggingConfig(),
+    val radio: RadioConfig = RadioConfig(),
 ) {
     companion object {
         /** Strict reader: unknown keys are errors; missing keys keep their defaults. */

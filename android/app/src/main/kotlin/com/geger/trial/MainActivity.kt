@@ -153,6 +153,8 @@ class MainActivity : ComponentActivity() {
         },
         arReady = arStatus == ArStatus.Ready,
         permissionsOk = permissionsOk,
+        radioInfo = radioSummary().first,
+        radiosOk = radioSummary().second,
         runType = runType, carryMode = carryMode, tester = tester, notes = notes, plateSizeCm = plateSizeCm,
         mapInfo = map?.let { "${it.map.venue} v${it.map.version} · ${it.map.levels.size} level(s), ${it.map.anchors.size} plate(s), ${it.map.checkpoints.size} checkpoint(s)" }
             ?: "No map (not needed for a desk test)",
@@ -199,11 +201,44 @@ class MainActivity : ComponentActivity() {
 
     // ---- Actions ---------------------------------------------------------------------------
 
+    /** Permissions recording can't do without: camera (tracking, QR) and the step detector. */
     private fun hasPermissions() = listOf(Manifest.permission.CAMERA, Manifest.permission.ACTIVITY_RECOGNITION)
-        .all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
+        .all { granted(it) }
+
+    private fun granted(p: String) = ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
+
+    /** Radio permissions (optional: a radio without permission is just skipped and reported). */
+    private fun radioPermissions(): List<String> = buildList {
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_SCAN)
+        if (android.os.Build.VERSION.SDK_INT >= 33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+    }
 
     private fun requestPermissions() =
-        permissionRequest.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACTIVITY_RECOGNITION))
+        permissionRequest.launch((listOf(Manifest.permission.CAMERA, Manifest.permission.ACTIVITY_RECOGNITION) + radioPermissions()).toTypedArray())
+
+    /**
+     * One line describing the radios for the setup screen: what is switched off or not permitted.
+     * Concept: the radios are optional for recording, but a beacon test is pointless with
+     * Bluetooth off, so the tester sees problems before starting.
+     */
+    private fun radioSummary(): Pair<String, Boolean> {
+        val bt = getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter?.isEnabled == true
+        val loc = getSystemService(android.location.LocationManager::class.java)?.isLocationEnabled == true
+        val wifiOn = applicationContext.getSystemService(android.net.wifi.WifiManager::class.java)?.isWifiEnabled == true
+        val rtt = packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_RTT)
+        val missing = radioPermissions().filterNot { granted(it) }
+        val problems = buildList {
+            if (!bt) add("Bluetooth is off")
+            if (!loc) add("Location is off")
+            if (!wifiOn) add("Wi-Fi is off")
+            if (missing.isNotEmpty()) add("radio permissions not granted")
+        }
+        val text = if (problems.isEmpty()) "Radios: Bluetooth, Wi-Fi and Location on" + (if (rtt) " · Wi-Fi ranging supported" else "")
+        else "Radios: ${problems.joinToString(", ")} (beacons, Wi-Fi or GPS won't be recorded)"
+        return text to problems.isEmpty()
+    }
 
     /** Starts a session: recorder first (so the first frames are logged), then the camera. */
     private fun startRecording() {

@@ -371,6 +371,31 @@
       if (need(b, where, 'origin_px', 'array') && (b.origin_px.length !== 2 || !b.origin_px.every(isNum))) errors.push(`${where}: origin_px must be [x, y]`);
     });
 
+    // ---- Beacons (Bluetooth)
+    const beacons = list('beacons');
+    const uuidRe = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+    const beaconKeys = {};
+    beacons.forEach((b, i) => {
+      const where0 = `beacons[${i}]`;
+      const ok = ['id', 'level', 'uuid'].every(f => need(b, where0, f, 'string')) &
+        ['x', 'y', 'height_m'].every(f => need(b, where0, f, 'number')) &
+        ['major', 'minor'].every(f => need(b, where0, f, 'int'));
+      if (!ok) return;
+      const where = `${where0} '${b.id}'`;
+      checkLevel(where, b.level);
+      if (!isNum(b.x) || !isNum(b.y)) errors.push(`${where}: x and y must be finite numbers`);
+      if (!(b.height_m >= 0) || !isNum(b.height_m)) errors.push(`${where}: height_m must be zero or more, got ${b.height_m}`);
+      if (!uuidRe.test(b.uuid)) errors.push(`${where}: uuid must look like D55248B4-8F80-46C8-88AC-EEC9C72B2B7C, got "${b.uuid}"`);
+      if (b.major < 0 || b.major > 65535) errors.push(`${where}: major must be 0–65535, got ${b.major}`);
+      if (b.minor < 0 || b.minor > 65535) errors.push(`${where}: minor must be 0–65535, got ${b.minor}`);
+      const key = `${b.uuid.toUpperCase()}:${b.major}:${b.minor}`;
+      (beaconKeys[key] = beaconKeys[key] || []).push(b.id);
+    });
+    checkIds('beacons', beacons);
+    for (const [key, ids] of Object.entries(beaconKeys)) {
+      if (ids.length > 1) errors.push(`beacons: ${ids.map(i => `'${i}'`).join(', ')} share the identity ${key} (uuid + major + minor must be unique)`);
+    }
+
     if (errors.length) return { errors, warnings };
 
     // ---- Pass 2: geometry warnings
@@ -406,7 +431,7 @@
 
   /** Key order per section, matching SPEC.md's example. Unknown keys follow in their original order. */
   const KEY_ORDER = {
-    top: ['schema', 'venue', 'version', 'units', 'levels', 'walkable', 'obstacles', 'nodes', 'edges', 'anchors', 'checkpoints', 'destinations', 'backgrounds'],
+    top: ['schema', 'venue', 'version', 'units', 'levels', 'walkable', 'obstacles', 'nodes', 'edges', 'anchors', 'checkpoints', 'destinations', 'backgrounds', 'beacons'],
     levels: ['id', 'name', 'elevation_m'],
     walkable: ['level', 'polygon'],
     obstacles: ['level', 'polygon'],
@@ -416,6 +441,7 @@
     checkpoints: ['id', 'level', 'x', 'y', 'heading_deg'],
     destinations: ['id', 'name', 'node'],
     backgrounds: ['level', 'image', 'px_per_m', 'origin_px'],
+    beacons: ['id', 'level', 'x', 'y', 'height_m', 'uuid', 'major', 'minor'],
   };
 
   /**
@@ -476,7 +502,7 @@
     return {
       schema: SUPPORTED_SCHEMA, venue: 'new-venue', version: 1, units: 'm',
       levels: [{ id: 'L1', name: 'Level 1', elevation_m: 0 }],
-      walkable: [], obstacles: [], nodes: [], edges: [], anchors: [], checkpoints: [], destinations: [], backgrounds: [],
+      walkable: [], obstacles: [], nodes: [], edges: [], anchors: [], checkpoints: [], destinations: [], backgrounds: [], beacons: [],
     };
   }
 
@@ -485,7 +511,7 @@
    * so validation still sees exactly what was in the file.
    */
   function withDefaultLists(m) {
-    for (const k of ['walkable', 'obstacles', 'nodes', 'edges', 'anchors', 'checkpoints', 'destinations', 'backgrounds']) {
+    for (const k of ['walkable', 'obstacles', 'nodes', 'edges', 'anchors', 'checkpoints', 'destinations', 'backgrounds', 'beacons']) {
       if (m[k] === undefined) m[k] = [];
     }
     return m;

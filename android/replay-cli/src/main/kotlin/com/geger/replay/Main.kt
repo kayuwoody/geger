@@ -60,7 +60,7 @@ private fun validateMap(args: List<String>, out: (String) -> Unit, err: (String)
         is MapLoadResult.Ok -> {
             val m = r.map
             out("OK: ${m.venue} v${m.version} - ${m.levels.size} levels, ${m.nodes.size} nodes, ${m.edges.size} edges, " +
-                "${m.anchors.size} anchors, ${m.checkpoints.size} checkpoints, ${m.destinations.size} destinations")
+                "${m.anchors.size} anchors, ${m.checkpoints.size} checkpoints, ${m.destinations.size} destinations, ${m.beacons.size} beacons")
             r.warnings.forEach { out("WARNING: $it") }
             0
         }

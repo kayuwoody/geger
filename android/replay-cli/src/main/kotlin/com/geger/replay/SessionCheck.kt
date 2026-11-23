@@ -3,7 +3,10 @@ package com.geger.replay
 import com.geger.positioning.log.LogReader
 import com.geger.positioning.log.RateCheck
 import com.geger.positioning.log.RecordType
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -36,6 +39,13 @@ internal fun checkSession(args: List<String>, out: (String) -> Unit, err: (Strin
     var qrSightings = 0
     var qrAccepted = 0
     val qrReasons = sortedMapOf<String, Int>()
+    val beaconRssi = sortedMapOf<String, MutableList<Int>>()
+    val wifiIds = HashSet<String>()
+    val rttIds = HashSet<String>()
+    var rttOk = 0
+    var bestGnss = Double.POSITIVE_INFINITY
+    var maxSatsUsed = 0
+    var radioStatus: JsonObject? = null
     val counts = sortedMapOf<String, Long>()
     var firstT = Long.MAX_VALUE
     var lastT = Long.MIN_VALUE
@@ -50,6 +60,20 @@ internal fun checkSession(args: List<String>, out: (String) -> Unit, err: (Strin
                     RecordType.SESSION_END -> end = e.fields
                     RecordType.TIMEBASE -> timebases += e.fields
                     RecordType.CALIB_POINT -> calibPoints += e.fields
+                    RecordType.RADIO_STATUS -> radioStatus = e.fields
+                    RecordType.BLE -> {
+                        val name = e.fields["beacon"]?.jsonPrimitive?.contentOrNull ?: e.fields["key"]?.jsonPrimitive?.content ?: "?"
+                        e.fields["rssi"]?.jsonPrimitive?.intOrNull?.let { beaconRssi.getOrPut(name) { mutableListOf() } += it }
+                    }
+                    RecordType.WIFI_SCAN -> (e.fields["aps"] as? JsonArray)?.forEach { ap ->
+                        (ap as? JsonObject)?.get("id")?.jsonPrimitive?.content?.let(wifiIds::add)
+                    }
+                    RecordType.WIFI_RTT -> (e.fields["results"] as? JsonArray)?.forEach { r ->
+                        val o = r as? JsonObject ?: return@forEach
+                        if (o["ok"]?.jsonPrimitive?.content == "true") { rttOk++; o["id"]?.jsonPrimitive?.content?.let(rttIds::add) }
+                    }
+                    RecordType.GNSS_FIX -> e.fields["accuracy_m"]?.jsonPrimitive?.doubleOrNull?.let { bestGnss = minOf(bestGnss, it) }
+                    RecordType.GNSS_STATUS -> e.fields["used"]?.jsonPrimitive?.intOrNull?.let { maxSatsUsed = maxOf(maxSatsUsed, it) }
                     RecordType.QR_DETECTION -> {
                         qrSightings++
                         if (e.fields["accepted"]?.jsonPrimitive?.content == "true") qrAccepted++
@@ -105,6 +129,24 @@ internal fun checkSession(args: List<String>, out: (String) -> Unit, err: (Strin
     if (qrSightings > 0) {
         out("QR sightings: $qrSightings, accepted $qrAccepted")
         qrReasons.forEach { (r, n) -> out("  rejected $n× : $r") }
+    }
+    radioStatus?.let { rs ->
+        val off = listOf("bluetooth_on" to "Bluetooth off", "location_on" to "Location off", "wifi_on" to "Wi-Fi off",
+            "bluetooth_permitted" to "Bluetooth not permitted", "location_permitted" to "Location not permitted")
+            .filter { rs[it.first]?.jsonPrimitive?.content == "false" }.map { it.second }
+        out("Radios started: ${rs["started"] ?: "[]"}" + if (off.isEmpty()) "" else " (${off.joinToString()})")
+    }
+    if (beaconRssi.isNotEmpty() || (counts["ble"] ?: 0) > 0) {
+        out("Beacons heard: ${beaconRssi.size}")
+        for ((name, rssi) in beaconRssi) {
+            val sorted = rssi.sorted()
+            out(String.format(Locale.ROOT, "  %-28s %6d broadcasts, %5.1f/s, median RSSI %d dBm (%d to %d)",
+                name, rssi.size, rssi.size / duration, sorted[sorted.size / 2], sorted.first(), sorted.last()))
+        }
+    }
+    if ((counts["wifi_scan"] ?: 0) > 0) out("Wi-Fi: ${counts["wifi_scan"]} scans, ${wifiIds.size} distinct access points; ranging: ${counts["wifi_rtt"] ?: 0} rounds, $rttOk distances from ${rttIds.size} access points")
+    if ((counts["gnss_status"] ?: 0) > 0 || (counts["gnss_fix"] ?: 0) > 0) {
+        out("GPS: ${counts["gnss_fix"] ?: 0} fixes" + (if (bestGnss.isFinite()) String.format(Locale.ROOT, " (best ±%.0f m)", bestGnss) else "") + ", at most $maxSatsUsed satellites used")
     }
     if (calibPoints.isNotEmpty()) out("Calibration spots (measured distance vs tape):")
     for (c in calibPoints) {

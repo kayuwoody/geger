@@ -50,6 +50,8 @@ class SessionCheckTest {
         stream("rotation:game", 50) { record(it, RecordType.ROTATION).str("s", "game").nums("q", 0.0, 0.0, 0.0, 1.0).build() }
         stream("rotation:rot", 50) { record(it, RecordType.ROTATION).str("s", "rot").nums("q", 0.0, 0.0, 0.0, 1.0).build() }
         stream("magnetometer", 50) { record(it, RecordType.MAGNETOMETER).num("x", 30.0).build() }
+        stream("ble", 10) { record(it, RecordType.BLE).str("key", "D55248B4-8F80-46C8-88AC-EEC9C72B2B7C:1:1").str("beacon", "B01").int("rssi", -70).build() }
+        stream("gnss_status", 1) { record(it, RecordType.GNSS_STATUS).int("visible", 9).int("used", 0).build() }
         val tEnd = t0 + seconds * 1_000_000_000L
         if (withEnd) {
             for (s in listOf("arcore_frame", "sensors")) {
@@ -74,6 +76,8 @@ class SessionCheckTest {
         assertEquals(0, cli("check-session", syntheticSession().path), "err: $err")
         assertTrue(out.any { it.startsWith("Counts match") }, out.toString())
         assertTrue(out.last() == "RESULT: PASS")
+        assertTrue(out.any { it.contains("B01") && it.contains("300 broadcasts") && it.contains("median RSSI -70") }, out.toString())
+        assertTrue(out.any { it.startsWith("GPS: 0 fixes") }, out.toString())
     }
 
     @Test

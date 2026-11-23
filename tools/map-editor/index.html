@@ -91,6 +91,7 @@
   <button data-tool="edge" title="Connect two nodes (E)">Edge<small>E</small></button>
   <button data-tool="anchor" title="Place QR plate (A)">QR<small>A</small></button>
   <button data-tool="checkpoint" title="Place checkpoint (C)">Chk<small>C</small></button>
+  <button data-tool="beacon" title="Place Bluetooth beacon (B)">Bcn<small>B</small></button>
   <button data-tool="scale" title="Set image scale from a measured distance (S)">Scale<small>S</small></button>
   <button data-tool="origin" title="Set the map origin on the image (G)">Orig<small>G</small></button>
 </nav>
@@ -118,7 +119,7 @@
   </section>
 
   <section id="edge-panel">
-    <h2>New edges</h2>
+    <h2>Defaults for new items</h2>
     <div class="row"><label for="edge-kind">Kind</label>
       <select id="edge-kind">
         <option value="walk">walk</option>
@@ -129,6 +130,8 @@
       </select></div>
     <div class="row"><label for="def-mount">Plate height (m)</label><input type="number" step="0.01" id="def-mount" value="1.5"></div>
     <div class="row"><label for="def-size">Plate frame (m)</label><input type="number" step="0.001" id="def-size" value="0.18"></div>
+    <div class="row"><label for="def-beacon-height">Beacon height (m)</label><input type="number" step="0.1" id="def-beacon-height" value="2.8"></div>
+    <div class="row"><label for="def-beacon-uuid">Beacon UUID</label><input type="text" id="def-beacon-uuid" value="D55248B4-8F80-46C8-88AC-EEC9C72B2B7C"></div>
   </section>
 
   <section id="props-panel">

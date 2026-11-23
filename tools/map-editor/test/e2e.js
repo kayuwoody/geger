@@ -110,6 +110,8 @@ async function makeFloorImage(browser, file) {
   await dragMap(0, 2, 2, 2);          // plate on the west wall, facing east (90°)
   await page.keyboard.press('c');
   await dragMap(10, 1.5, 12, 1.5);    // checkpoint heading east (90°)
+  await page.keyboard.press('b');
+  await clickMap(15, 4);              // a Bluetooth beacon on the corridor's north wall
   await page.keyboard.press('v');
   await clickMap(18, 8);              // select node n3 and make it a destination
   await page.getByRole('button', { name: 'Make destination' }).click();
@@ -124,6 +126,7 @@ async function makeFloorImage(browser, file) {
   assert.deepEqual([drawn.anchors[0].id, drawn.anchors[0].x, drawn.anchors[0].y, drawn.anchors[0].facing_deg], ['A01', 0, 2, 90]);
   assert.deepEqual([drawn.checkpoints[0].id, drawn.checkpoints[0].heading_deg], ['C01', 90]);
   assert.equal(drawn.destinations[0].node, 'n3');
+  assert.deepEqual(drawn.beacons, [{ id: 'B01', level: 'L1', x: 15, y: 4, height_m: 2.8, uuid: 'D55248B4-8F80-46C8-88AC-EEC9C72B2B7C', major: 1, minor: 1 }]);
   const v = core.validateMap(drawn);
   assert.deepEqual(v.errors, [], 'drawn map should have no errors');
 

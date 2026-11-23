@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  App manifest (milestone M3).
-  - CAMERA: ARCore motion tracking uses the back camera. No images are saved.
+  App manifest (milestones M3–M4b).
+  - CAMERA: ARCore motion tracking and QR plates use the back camera. No images are saved.
   - ACTIVITY_RECOGNITION: required on Android 10+ to read the step detector.
+  - Radios (M4b, all optional): BLUETOOTH_SCAN for beacons (without "neverForLocation", because beacon
+    signals are used for positioning - Android would otherwise hide beacons); ACCESS_FINE_LOCATION for
+    Wi-Fi scans, Wi-Fi ranging and GPS; NEARBY_WIFI_DEVICES for Wi-Fi ranging on Android 13+.
   - ARCore is required (the app is useless without it), and needs OpenGL ES 2.0.
   - The FileProvider shares exported session zips with other apps (Drive, Gmail, Quick Share).
 -->
@@ -11,10 +14,21 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
 
     <uses-feature android:name="android.hardware.camera" android:required="true" />
     <uses-feature android:name="android.hardware.camera.ar" android:required="true" />
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.rtt" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
     <application
         android:allowBackup="false"

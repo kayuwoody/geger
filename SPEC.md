@@ -21,6 +21,7 @@ The app runs on a Galaxy S22 Ultra and S23 Ultra. It shows AR arrows along a rou
 - Basic AR overlay: chevrons on the floor along a route; a 2D map when the phone is held flat
 - Ground-truth capture at checkpoints, full sensor logging, export
 - Tools: browser map editor, plate generator, replay CLI, analysis report
+- Radio recording for offline evaluation: Bluetooth beacons, Wi-Fi scans and ranging, GPS (milestone M4b)
 
 ### Out of scope
 
@@ -62,6 +63,7 @@ The Android app gathers sensor readings and solves QR fixes; all positioning log
 Android app: sensors
   ARCore (camera pose, image) | Motion sensors (IMU, rotation vectors)
   Steps, barometer            | Proximity, light (pocket detection)
+  Radios: BLE beacons, Wi-Fi scans + ranging, GPS (logged from M4b) -+
         |                                   |
         | image                             | raw readings, timestamped
         v                                   |
@@ -203,6 +205,22 @@ The numbers above are an illustration, not survey data.
 - **`version`**: incremented on every save and logged with each session.
 - **Validation on load**: unique ids; edges reference existing nodes; angles in \[0, 360); anchors and checkpoints inside walkable areas (a warning, not an error, since plates sit on walls).
 
+### Bluetooth beacons
+
+An optional `beacons` section lists the beacons on the route, one entry each:
+
+```json
+"beacons": [
+  {"id": "B01", "level": "L1", "x": 12.0, "y": 3.9, "height_m": 2.8,
+   "uuid": "D55248B4-8F80-46C8-88AC-EEC9C72B2B7C", "major": 1, "minor": 1}
+]
+```
+
+- **Identity:** `uuid`, `major` and `minor` are the beacon's iBeacon identity; the combination must be unique. `uuid` is 8-4-4-4-12 hex digits; `major` and `minor` are whole numbers 0–65535.
+- **Project UUID:** all our beacons share `D55248B4-8F80-46C8-88AC-EEC9C72B2B7C`; `major` = level number, `minor` = beacon number.
+- **Height:** `height_m` is metres above that level's floor (zero or more).
+- **No walkability warning:** beacons usually hang on walls and pillars, outside walkable space.
+
 ### Map editor (`tools/map-editor`)
 
 A single static HTML page with no build step and no server, opened in Chrome on a laptop.
@@ -212,7 +230,7 @@ A single static HTML page with no build step and no server, opened in Chrome on 
 - Draw walkable polygons and obstacles.
 - Place nodes, connect them with edges, pick each edge's kind.
 - Place anchors (click, drag to set facing, type height and size) and checkpoints (click, drag to set heading).
-- Name destinations.
+- Name destinations. Place Bluetooth beacons with their iBeacon UUID, major and minor.
 - Every placed item also takes typed coordinates, so surveyed positions can be entered exactly.
 - Show the cursor position in metres; snap to 0.1 m.
 - Import and export `map.json`, showing validation errors before export.
@@ -379,6 +397,18 @@ Each session writes one JSON Lines file to app-private storage, gzipped when the
 | `note` | Each note | Text |
 | `session_end` | Once | Duration, record counts, dropped-record count, end reason |
 
+Radio records (milestone M4b), recorded for offline evaluation of which positioning layers the mall needs:
+
+| `type` | Rate | Fields |
+| --- | --- | --- |
+| `ble` | Each beacon broadcast heard | Beacon identity (uuid, major, minor or Eddystone namespace and instance), RSSI in dBm, measured power at 1 m. Only iBeacon and Eddystone-UID broadcasts are kept; shoppers' phones, earbuds and watches are never logged (PDPA) |
+| `wifi_scan` | Each scan (Android allows 4 per 2 minutes unless the developer option "Wi-Fi scan throttling" is off) | Per access point: BSSID (hashed unless its network name is on the config's allow list), network name only if allow-listed, frequency, RSSI, whether it supports ranging (802.11mc) |
+| `wifi_rtt` | Each ranging round, about once a second while ranging-capable access points are in range | Per access point: BSSID (hashed the same way), distance and its standard deviation in metres, RSSI, status |
+| `gnss_fix` | Each GPS fix, about once a second | Latitude, longitude, accuracy, altitude, speed, bearing |
+| `gnss_status` | Each satellite update, about once a second | Satellites visible and used, mean signal strength (C/N0) of the used ones |
+
+Hashed BSSID = the first 12 hex digits of its SHA-256, so the same access point gets the same code in every session without naming anyone's personal hotspot.
+
 - **Writer:** its own background thread with a large buffered queue, flushed every second. It never blocks the sensor or render threads; any dropped records are counted and reported in `session_end`.
 - **Reader:** `positioning-core` has a `LogReader` for the same format, used by the replay CLI. A write-then-read round-trip test is part of M3.
 - **Export zip:** the session file, the exact `map.json` used and the config.
@@ -412,7 +442,7 @@ It also writes `summary.csv`, one row per session and estimator, to compare many
 
 ## Milestones
 
-Seven milestones, built in order. Each one is done when every check under it passes and the work is committed. An office or home dry run (a 30 m loop with 4 checkpoints and 2 plates) happens before any mall visit.
+Eight milestones (M1–M7 plus M4b), built in order. Each one is done when every check under it passes and the work is committed. An office or home dry run (a 30 m loop with 4 checkpoints and 2 plates) happens before any mall visit.
 
 - [ ] **M1: repo and core model**
   - Build: Gradle project with `app`, `positioning-core` and `replay-cli`; `tools/` folders; README with build steps; config defaults. In core: map model, loader and validator; point-in-polygon and path-crosses-wall geometry; A\* routing; frame conversions; angle helpers. A hand-written sample map for tests.
@@ -426,6 +456,9 @@ Seven milestones, built in order. Each one is done when every check under it pas
 - [ ] **M4: plates, QR fix and calibration mode**
   - Build: `tools/plates`; detection pipeline; pose solve; gravity disambiguation; alignment; gating; calibration screen.
   - Check: synthetic test projects the frame corners from 50 random poses (1–10 m, up to 60°), adds 0.5 px noise, and recovers position within 2% of distance and heading within 2°. A plate rotated 90° and 180° on a desk gives correctly rotated poses. Tape-measured desk distances of 1, 2 and 4 m come back within 5%.
+- [ ] **M4b: radio recording**
+  - Build: a `beacons` section in the map (both validators and the editor); the recorder logs `ble`, `wifi_scan`, `wifi_rtt`, `gnss_fix` and `gnss_status`; live counts on screen; `check-session` reports them; a beacon setup guide.
+  - Check: a desk session near one configured beacon logs it several times a second at a plausible RSSI (−50 to −90 dBm); no other Bluetooth devices appear in the log; Wi-Fi scans and GPS status are recorded; the shared map fixtures with beacons pass in Kotlin and JavaScript.
 - [ ] **M5: estimators and 2D map**
   - Build: E1, E2 and E3 in core; floor detection; phone mode; live 2D map; checkpoint capture.
   - Check: unit tests where a synthetic corridor walk with added drift stays inside the walls and snaps back after a QR fix; the floor detector fires on a synthetic one-level pressure step and not on 0.3 hPa of drift over 10 minutes; resampling keeps total weight at 1; a synthetic L-shaped walk works for E2. The dry run produces complete checkpoint records.
@@ -439,7 +472,7 @@ Seven milestones, built in order. Each one is done when every check under it pas
   - Build: one web page using WebXR AR in Chrome on Android, showing floor chevrons from a fixed alignment and logging poses.
   - Check: a side-by-side note comparing its tracking with the native app on the same loop.
 
-Phase 0 build is done when M1–M7 are ticked, both phones have the app installed, plates are printed and measured, and the dry-run report exists.
+Phase 0 build is done when M1–M7 and M4b are ticked, both phones have the app installed, plates are printed and measured, and the dry-run report exists.
 
 ## On-site test protocol
 
@@ -449,8 +482,8 @@ This part is for the tester. Run the same steps at small scale in the office dry
 
 - [ ] **Mall permission:** plates on walls and pillars (removable mounting), tape marks on the floor, walking around holding a phone up, and agreed times.
 - [ ] **Pick the route:** about 200 m with at least 3 turns, one long straight corridor, a shiny-floor stretch, an escalator up and a lift back down.
-- [ ] **Equipment:** laser distance meter, tape measure, floor tape in two colours, printed plates in both sizes, removable mounting, both phones charged plus a power bank, laptop with the map editor.
-- [ ] **Plates:** 4–6 along the route (start, before and after the escalator, mid-route, at the lift), frame centre at 1.5 m, facing into the corridor. Measure each printed frame with a ruler.
+- [ ] **Equipment:** laser distance meter, tape measure, floor tape in two colours, printed plates in both sizes, 6–10 Bluetooth beacons set up per `docs/BEACON_SETUP.md`, removable mounting, both phones charged plus a power bank, laptop with the map editor.
+- [ ] **Plates:** 4–6 along the route (start, before and after the escalator, mid-route, at the lift), frame centre at 1.5 m, facing into the corridor. Measure each printed frame with a ruler. Mount the beacons along the route too (about every 10 m, 2.5–3 m up) and survey them like the plates.
 - [ ] **Checkpoints:** a tape X every 15–25 m and at every turn, with a tape arrow pointing along the route.
 - [ ] **Survey:** measure every plate and checkpoint with the laser from two fixed features (walls, pillars) that appear on the floor image. Type the coordinates, heights and facings into the map editor.
 - [ ] **Check the map:** load it in the app and confirm plates and checkpoints land in the right places on the 2D map.
@@ -469,7 +502,7 @@ Unless a run says otherwise, scan only the start plate, from wherever you stand 
 | F | Escalator up, then lift down | Held up | 3 |
 | G | Run B again at a busy time (weekend afternoon) | Held up | 2 |
 
-During every run: add a note for anything unusual (crowd, blocked path, phone in a bag), keep walkways clear, and don't photograph shoppers.
+During every run: keep Bluetooth, Wi-Fi and Location switched on; add a note for anything unusual (crowd, blocked path, phone in a bag), keep walkways clear, and don't photograph shoppers.
 
 ### After each visit
 

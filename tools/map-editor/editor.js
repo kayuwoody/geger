@@ -62,6 +62,7 @@
     checkpoint: { key: 'c', hint: 'Press on the floor mark and drag along its tape arrow. Type exact surveyed values in Selection.' },
     scale: { key: 's', hint: 'Click two points on the floor image a known distance apart, then type the measured distance in metres.' },
     origin: { key: 'g', hint: 'Click the point on the floor image that should be the map origin (0, 0).' },
+    beacon: { key: 'b', hint: 'Click where a Bluetooth beacon hangs. Set its iBeacon UUID, major and minor in Selection (defaults under New edges).' },
   };
 
   // ===========================================================================================
@@ -178,7 +179,7 @@
 
   /** True if anything other than the background is drawn on [level]. */
   function levelHasContent(level) {
-    return ['walkable', 'obstacles', 'nodes', 'anchors', 'checkpoints'].some(t => items(t).some(x => x.level === level));
+    return ['walkable', 'obstacles', 'nodes', 'anchors', 'checkpoints', 'beacons'].some(t => items(t).some(x => x.level === level));
   }
 
   /** Shows a short message in the status bar for a few seconds. */
@@ -199,7 +200,7 @@
   const screenDist = (p, sx, sy) => { const s = toScreen(p); return Math.hypot(s.x - sx, s.y - sy); };
 
   /** The nearest point-like item (node, anchor, checkpoint) on this level within HIT_PX, or null. */
-  function hitPoint(sx, sy, types = ['nodes', 'anchors', 'checkpoints']) {
+  function hitPoint(sx, sy, types = ['nodes', 'anchors', 'checkpoints', 'beacons']) {
     let best = null;
     for (const type of types) {
       for (const { it, index } of onLevel(items(type))) {
@@ -363,7 +364,7 @@
     select(p, sx, sy) {
       const hit = hitAny(sx, sy);
       S.sel = hit ? (({ d, ...rest }) => rest)(hit) : null;
-      if (hit && (['nodes', 'anchors', 'checkpoints'].includes(hit.type) || hit.type === 'vertex')) {
+      if (hit && (['nodes', 'anchors', 'checkpoints', 'beacons'].includes(hit.type) || hit.type === 'vertex')) {
         S.drag = { hit, start: p, snapshotTaken: false };
       }
       renderProps();
@@ -411,6 +412,24 @@
 
     /** Checkpoint: press marks the floor point; the drag sets its heading (finished on mouse-up). */
     checkpoint(p, sx, sy) { S.draft = { pressing: 'checkpoint', at: p, sx, sy }; },
+
+    /**
+     * Beacon: place a Bluetooth beacon with the default height and UUID, major = the level's
+     * position in the level list (1, 2, ...), and the next free minor for that UUID and major.
+     */
+    beacon(p) {
+      const uuid = ($('def-beacon-uuid').value || '').trim().toUpperCase();
+      const major = Math.max(1, S.map.levels.findIndex(l => l.id === S.level) + 1);
+      const used = new Set(items('beacons').filter(b => (b.uuid || '').toUpperCase() === uuid && b.major === major).map(b => b.minor));
+      let minor = 1;
+      while (used.has(minor)) minor++;
+      edit(() => {
+        if (!Array.isArray(S.map.beacons)) S.map.beacons = [];
+        S.map.beacons.push({ id: C.nextId('B', idsOf('beacons'), 2), level: S.level, x: p.x, y: p.y,
+          height_m: Number($('def-beacon-height').value) || 2.8, uuid, major, minor });
+        S.sel = { type: 'beacons', index: S.map.beacons.length - 1 };
+      });
+    },
 
     /** Scale: two clicks on the image, then the measured distance sets px_per_m. */
     scale(p, sx, sy) {
@@ -591,6 +610,7 @@
       drawNodes();
       drawAnchors();
       drawCheckpoints();
+      drawBeacons();
       drawOrigin();
       drawSelection();
       drawDraft();
@@ -750,6 +770,18 @@
     }
   }
 
+  /** Bluetooth beacons: a blue dot with two signal arcs, labelled with id and major/minor. */
+  function drawBeacons() {
+    for (const { it } of onLevel(items('beacons'))) {
+      const s = toScreen(it);
+      ctx.fillStyle = '#1565c0';
+      ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#1565c0'; ctx.lineWidth = 1.5;
+      for (const r of [8, 13]) { ctx.beginPath(); ctx.arc(s.x, s.y, r, -Math.PI / 4, Math.PI / 4); ctx.stroke(); }
+      label(`${it.id} (${it.major}/${it.minor})`, s, '#1565c0', 15, 4);
+    }
+  }
+
   /** Map origin with short x (right) and y (up) axes. */
   function drawOrigin() {
     const o = toScreen({ x: 0, y: 0 });
@@ -829,7 +861,7 @@
   function fitView() {
     const pts = [];
     for (const t of ['walkable', 'obstacles']) for (const { it } of areasOn(t)) it.polygon.forEach(([x, y]) => pts.push({ x, y }));
-    for (const t of ['nodes', 'anchors', 'checkpoints']) for (const { it } of onLevel(items(t))) pts.push(it);
+    for (const t of ['nodes', 'anchors', 'checkpoints', 'beacons']) for (const { it } of onLevel(items(t))) pts.push(it);
     const b = bgFor(S.level);
     const loaded = S.images[S.level];
     if (b && loaded) {
@@ -958,10 +990,10 @@
     const num = (v) => (Number.isFinite(v) ? v : 0);
     const setNum = (obj, key) => v => { if (Number.isFinite(v)) edit(() => { obj[key] = C.roundNum(v); }); };
 
-    if (sel.type === 'nodes' || sel.type === 'anchors' || sel.type === 'checkpoints') {
+    if (sel.type === 'nodes' || sel.type === 'anchors' || sel.type === 'checkpoints' || sel.type === 'beacons') {
       const it = S.map[sel.type][sel.index];
       if (!it) { S.sel = null; return renderProps(); }
-      const title = { nodes: 'Route node', anchors: 'QR plate', checkpoints: 'Checkpoint' }[sel.type];
+      const title = { nodes: 'Route node', anchors: 'QR plate', checkpoints: 'Checkpoint', beacons: 'Bluetooth beacon' }[sel.type];
       box.insertAdjacentHTML('beforeend', `<div class="muted" style="margin-bottom:6px">${title} on ${it.level}</div>`);
       propRow(box, 'Id', it.id, v => renameId(sel.type, sel.index, v));
       propRow(box, 'x (m)', num(it.x), setNum(it, 'x'), { number: true });
@@ -972,6 +1004,13 @@
         propRow(box, 'Frame (m)', num(it.size_m), setNum(it, 'size_m'), { number: true, step: '0.001' });
       }
       if (sel.type === 'checkpoints') propRow(box, 'Heading (°)', num(it.heading_deg), setNum(it, 'heading_deg'), { number: true, step: '1' });
+      if (sel.type === 'beacons') {
+        const setInt = key => v => { if (Number.isInteger(v)) edit(() => { it[key] = v; }); else flash(`${key} must be a whole number.`); };
+        propRow(box, 'Height (m)', num(it.height_m), setNum(it, 'height_m'), { number: true, step: '0.1' });
+        propRow(box, 'UUID', it.uuid || '', v => edit(() => { it.uuid = String(v).trim().toUpperCase(); }));
+        propRow(box, 'Major', num(it.major), setInt('major'), { number: true, step: '1' });
+        propRow(box, 'Minor', num(it.minor), setInt('minor'), { number: true, step: '1' });
+      }
       if (sel.type === 'nodes') {
         const btns = document.createElement('div'); btns.className = 'btns';
         const add = document.createElement('button'); add.textContent = 'Make destination';
@@ -1072,7 +1111,7 @@
     if (S.map.levels.some(l => l.id === v)) { flash(`Level ${v} already exists.`); return renderLevels(); }
     edit(() => {
       S.map.levels.find(l => l.id === old).id = v;
-      for (const t of ['walkable', 'obstacles', 'nodes', 'anchors', 'checkpoints', 'backgrounds']) for (const x of S.map[t]) if (x.level === old) x.level = v;
+      for (const t of ['walkable', 'obstacles', 'nodes', 'anchors', 'checkpoints', 'backgrounds', 'beacons']) for (const x of items(t)) if (x.level === old) x.level = v;
       if (S.images[old]) { S.images[v] = S.images[old]; delete S.images[old]; }
       S.level = v;
     });

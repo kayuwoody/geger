@@ -30,6 +30,18 @@ object RecordType {
     const val QR_DETECTION = "qr_detection"
     /** A QR calibration spot: true distance/angle marked on the floor and the fixes collected there. */
     const val CALIB_POINT = "calib_point"
+    /** One Bluetooth beacon broadcast heard (iBeacon or Eddystone-UID only) (M4b). */
+    const val BLE = "ble"
+    /** One Wi-Fi scan's access points (M4b). */
+    const val WIFI_SCAN = "wifi_scan"
+    /** One Wi-Fi round-trip-time ranging round (M4b). */
+    const val WIFI_RTT = "wifi_rtt"
+    /** One GPS position fix (M4b). */
+    const val GNSS_FIX = "gnss_fix"
+    /** Satellite counts and signal strength (M4b). */
+    const val GNSS_STATUS = "gnss_status"
+    /** Which radios were on and permitted when recording started (M4b). */
+    const val RADIO_STATUS = "radio_status"
 }
 
 /**
